@@ -439,3 +439,45 @@ Why the rejects were rejected:
 4. **Optionally mine open logic textbooks** for formal-fallacy examples. Toy-sized
    like the templates, but different toys: modest syntactic variety, low effort,
    low priority.
+
+### Phase 1 result — schema v1.2 applied, and a hypothesis refuted
+
+Re-labelled the 176 records in candidate classes (sign, other, analogy, causal,
+categorical syllogism, generalization). 70 moved.
+
+**The IBE hypothesis was wrong.** It predicted `inference to the best explanation`
+would absorb a large share of `other`. It absorbed 3 of 35. IBE's 37 records come
+almost entirely from `sign` (21, the merge working as designed) and `causal` (10).
+
+**`other` collapsed anyway, 35 -> 9, but scattered** — mostly to `causal` (12), plus
+categorical syllogism, disjunctive syllogism, hypothetical syllogism, modus ponens.
+
+**Root cause found: two precedence rules contradicted each other.** Rule 2 assigned
+`causal` when the conclusion asserts causation; rule 5 assigned `other` for a
+passage chaining several inferences. A multi-step causal chain satisfied both, so
+the labeller was resolving a coin flip. Rules rewritten per decision: a chain of
+ONE kind of inference takes that kind's name; `other` is reserved for chains that
+cross KINDS (Aquinas: causal chain + no-infinite-regress + identification with God).
+
+**Two failures worth recording, because they bound what prompt work can achieve:**
+
+1. The rewritten rule did NOT fix the case it was written for. `gen_other_0364` is
+   a causal chain ending in the normative "transparency is paramount for effective
+   governance" — rule 6 explicitly names that pattern as `other`, and the labeller
+   still returns `causal`.
+2. **Gemini's labelling has a ~12% noise floor.** Re-running the same 176 records at
+   temperature 0 after editing rules 5/6 flipped 21 labels (12%), including changes
+   unrelated to the edit: causal -> generalization, other -> authority, categorical
+   syllogism -> authority. Small prompt edits perturb labels far from the edit.
+
+That is the third prompt-engineering misfire in this project (the false-dilemma
+overcorrection, this rule, and the collateral flips). STOP TUNING THE LABELER
+PROMPT. Design around a ~12% label noise floor instead: keep contested records out
+of held-out splits, and prefer human or constructed labels wherever a class matters.
+
+### State entering Phase 2
+
+840 records across 18 of 22 forms. Four classes have ZERO records — ad populum,
+begging the question, straw man, equivocation — all four sourced in Phase 2 from
+`data/logic/`. Eight classes sit under 25 records and need Phase 3 generation,
+most urgently `application of generalization` (3) and `other` (9).

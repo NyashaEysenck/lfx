@@ -1,11 +1,34 @@
-"""The v1.1 label schema: the form enum, its families, and validity checks."""
+"""The v1.2 label schema: the form enum, its families, and validity checks.
+
+v1.2 aligns the enum with Duke's "Think Again" specialization, whose syllabi were
+checked on 2026-09-04. Two corrections came out of that:
+
+  - `sign` is gone, merged into `inference to the best explanation`. Every record
+    it held was observed-indicator -> underlying-condition (spectral lines ->
+    atmospheric composition, charcoal -> past wildfire, destroyed evidence ->
+    guilt), which is IBE in Duke's framing. Sign is a finer slice than Duke cuts.
+  - `application of generalization` and `inference to the best explanation` are
+    added. Duke's Think Again III teaches generalization, application, IBE,
+    analogy and causal — NOT the generalization/analogy/causal/sign/authority list
+    the project brief originally attributed to it, which is a different textbook
+    tradition.
+
+`authority` stays. Duke files Appeals to Authority under Think Again IV's fallacies
+of relevance, but the lesson teaches telling legitimate appeals from illegitimate
+ones rather than rejecting the form, and this schema extracts rather than evaluates.
+
+The four informal fallacies added are Duke Think Again IV topics with real
+human-labelled data available in data/logic/.
+"""
 
 VALID_DEDUCTIVE = ["modus ponens", "modus tollens", "hypothetical syllogism",
                    "disjunctive syllogism", "categorical syllogism",
                    "reductio ad absurdum"]
-INDUCTIVE = ["generalization", "analogy", "causal", "sign", "authority"]
+INDUCTIVE = ["generalization", "application of generalization",
+             "inference to the best explanation", "analogy", "causal", "authority"]
 FORMAL_FALLACY = ["affirming the consequent", "denying the antecedent"]
-INFORMAL_FALLACY = ["ad hominem", "hasty generalization", "false dilemma"]
+INFORMAL_FALLACY = ["ad hominem", "hasty generalization", "false dilemma",
+                    "ad populum", "begging the question", "straw man", "equivocation"]
 
 FORMS = VALID_DEDUCTIVE + INDUCTIVE + FORMAL_FALLACY + INFORMAL_FALLACY + ["other"]
 

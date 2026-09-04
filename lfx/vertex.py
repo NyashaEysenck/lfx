@@ -55,9 +55,42 @@ Field rules:
       disjunctive syllogism, categorical syllogism (quantified premises about
       classes, e.g. "All A are B; s is A; so s is B"), reductio ad absurdum
       (assume a claim, derive a contradiction or absurdity, reject the claim).
-    * Inductive: generalization, analogy, causal, sign, authority.
+    * Inductive:
+      - generalization: from an observed SAMPLE to a broader population.
+        "Every raven we sampled was black, so ravens are black."
+      - application of generalization: the INVERSE — from a population-level
+        generalization down to a particular case. "Most Swedes are Lutheran;
+        Ingrid is Swedish; so Ingrid is probably Lutheran." Note the quantifier:
+        "most"/"usually" makes this inductive and probable. If the premise says
+        "all" and the conclusion is presented as certain, it is a CATEGORICAL
+        SYLLOGISM instead, and deductive.
+      - inference to the best explanation: an observation needs explaining, a
+        hypothesis would explain it, no rival explains it as well, so the
+        hypothesis is probably true. This covers reasoning from an INDICATOR to
+        the underlying condition it evidences — symptoms to a diagnosis, charcoal
+        in sediment to a past wildfire, destroyed evidence to guilt. The indicator
+        does not CAUSE the condition; it is evidence of it.
+      - analogy: two things share relevant features, one has a further property,
+        so the other probably does too.
+      - causal: the CONCLUSION ITSELF asserts that one thing causes another.
+      - authority: a qualified, relevant authority asserts a claim, so it is
+        probably true.
     * Formal fallacies: affirming the consequent, denying the antecedent.
-    * Informal fallacies: ad hominem, hasty generalization, false dilemma.
+    * Informal fallacies:
+      - ad hominem: rejects a claim by attacking the person advancing it.
+      - hasty generalization: generalizes from a sample far too small or biased.
+      - false dilemma: presents two options as exhaustive when others plainly exist.
+      - ad populum: infers that a claim is true because many people believe it, or
+        because it is popular or traditional.
+      - begging the question: the conclusion is assumed by one of the premises;
+        the argument moves in a circle. "He is a wonderful writer because he
+        writes so well."
+      - straw man: misrepresents or exaggerates an opponent's position, then
+        refutes the distorted version rather than what was actually claimed.
+      - equivocation: a key word or phrase shifts MEANING between premises, so the
+        argument only appears to work. The structure is often impeccable; the flaw
+        is semantic. "We have a right to free speech, therefore it is right to
+        speak falsely."
     * "other": use only when no listed form fits — typically a multi-step passage
       chaining several distinct inferences with no single dominant pattern. Prefer
       a specific form when one clearly dominates the argument's main inference.
@@ -83,12 +116,26 @@ Field rules:
      thing causes another. It is not a catch-all for arguments that explain,
      motivate, or offer evidence. An argument that infers a cause but reaches it by
      affirming a consequent is "affirming the consequent", not "causal".
-  3. "other" WINS OVER A PARTIAL MATCH. If the passage chains two or more DISTINCT
-     inferences — eliminating alternatives and then inferring a best explanation, or
-     a causal chain that terminates in a no-infinite-regress step, or a principle
-     plus a subsumption plus a normative conclusion — label it "other" even when one
-     of its steps, taken alone, resembles a named form. Only assign a named form when
-     that single form accounts for the WHOLE argument.
+  3. QUANTIFIER DECIDES between categorical syllogism and application of
+     generalization. "All A are B" with a conclusion presented as certain is a
+     categorical syllogism (deductive). "Most A are B" or "A are usually B" with a
+     hedged conclusion ("probably", "likely") is application of generalization
+     (inductive). Read the quantifier and the hedge before choosing.
+  4. EVIDENCE-TO-CONDITION IS IBE, NOT CAUSAL. If the conclusion says the evidence
+     indicates some condition obtains, that is inference to the best explanation.
+     Reserve "causal" for a conclusion that asserts one thing CAUSES another.
+  5. A CHAIN OF THE SAME KIND IS THAT KIND, NOT "other". A passage that runs
+     several steps of ONE sort of inference takes that form's name. A four-step
+     causal chain (cycling -> exercise -> energy -> concentration -> better work)
+     is "causal", not "other" — length alone does not make an argument
+     unclassifiable, and "causal" tells the reader more.
+  6. "other" IS FOR CHAINS THAT CROSS KINDS. Reserve it for a passage combining
+     DIFFERENT sorts of inference, where no single form covers the whole thing:
+     Aquinas running a causal chain, THEN a no-infinite-regress step, THEN an
+     identification with God; or a general principle, THEN a subsumption, THEN a
+     normative conclusion. Note the test is the KIND of step, not the number of
+     steps. A causal chain ending in a normative "therefore we should..." crosses
+     kinds and IS "other"; a causal chain ending in a causal claim is "causal".
 - suppressed_premise: an unstated assumption the argument needs in order to work.
   Give exactly one, the load-bearing one. Use null if the argument is complete as
   stated. Do not pad this field.
