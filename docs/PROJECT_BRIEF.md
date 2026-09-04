@@ -481,3 +481,56 @@ of held-out splits, and prefer human or constructed labels wherever a class matt
 begging the question, straw man, equivocation — all four sourced in Phase 2 from
 `data/logic/`. Eight classes sit under 25 records and need Phase 3 generation,
 most urgently `application of generalization` (3) and `other` (9).
+
+### Phase 2 result — four fallacy classes imported, composition fixed
+
+Extensions were checked by READING PASSAGES before mapping (the faulty
+generalization lesson). Quality varied: equivocation 6/6 clean, straw man ~5/6,
+begging the question ~4/6, ad populum ~3/6 — half of ad populum was GLOSSARY
+ENTRIES, not arguments ("Encourages the audience to become part of a group").
+
+Added a non-argument filter to `import_logic.py` for glossary entries, quiz
+questions and fragments. These are not label noise; they are text with no argument
+in it, and training on them teaches the model to extract structure that is not
+there. It cut ad populum 232 -> 181 and equivocation 49 -> 44.
+
+**Gemini/human agreement, which inverted the prediction from the samples:**
+
+  ad hominem            89%      straw man     66%
+  ad populum            83%      equivocation  64%
+  false dilemma         76%      begging the question  76%
+
+ad populum came out FINE once the glossary entries were filtered. equivocation came
+out LOWEST despite being the cleanest class sampled — and the disagreements turn out
+to be LOGIC's labels being wrong, not Gemini failing: a bare claim ("Science shows
+us that improved quality of life comes through research and invention") and a non
+sequitur (the barbecue exchange) are both labelled equivocation. The 6/6 sampled
+were the clean head of a noisy tail. straw man's 66% is mostly Gemini saying
+`ad hominem` — genuinely adjacent categories, and some LOGIC labels are wrong there
+too.
+
+**Consequence for the splits:** a human label is not automatically trustworthy.
+`split_corpus.py` now trusts a `logic-human` record only when Gemini's BLIND label
+agrees with it, instead of trusting the origin unconditionally. Otherwise LOGIC's
+noisy tail lands in the held-out sets, which is exactly where noise does most damage.
+
+**Composition fix — two caps in `merge_corpus.py`:**
+per-class cap 45, plus a sub-cap limiting TEMPLATE records to 40% of any class.
+Template share fell from 73-80% to 41-53%. Where limiting templates leaves a class
+short, the shortfall is REPORTED as a work order rather than backfilled with more
+templates.
+
+Result: 709 records, 630 surplus human-labelled records to `extra_test_human.jsonl`.
+
+**Phase 3 work order — 281 records of prose generation:**
+
+  application of generalization  need 42     hypothetical syllogism  need 22
+  other                          need 36     reductio ad absurdum    need 22
+  generalization                 need 33     categorical syllogism   need 13
+  hasty generalization           need 24     denying the antecedent  need 11 (tmpl-heavy)
+  analogy                        need 24     affirming the consequent need 10 (tmpl-heavy)
+  authority                      need 23     disjunctive syllogism   need 10 (tmpl-heavy)
+                                             inference to best expl. need  8
+
+Fallacies are 51% of the corpus, still too high. Filling the work order fixes this
+on its own: at 45 across all 22 classes, the 9 fallacy classes would be 41%.

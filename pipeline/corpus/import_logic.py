@@ -31,9 +31,39 @@ import re
 # sampled, and on inspection Gemini was right about nearly all of them. Importing
 # those 407 rows would have poisoned the class it was meant to strengthen.
 KEEP = {
-    "ad hominem": "ad hominem",              # 90% Gemini/human agreement — clean mapping
-    "false dilemma": "false dilemma",
+    "ad hominem": "ad hominem",              # 87% Gemini/human agreement on the full set
+    "false dilemma": "false dilemma",        # 79%
+    # Added for schema v1.2 (Duke Think Again IV topics). Extensions were checked by
+    # reading samples, not by trusting the class name — see the faulty
+    # generalization error above. Sample quality varies:
+    #   equivocation        6/6 clean, the best-curated class in LOGIC
+    #   fallacy of extension ~5/6 straw man (one was ad hominem, one a quiz question)
+    #   circular reasoning  ~4/6 (one was tu quoque)
+    #   ad populum          ~3/6 — half the class is DEFINITIONS, not arguments
+    "equivocation": "equivocation",
+    "fallacy of extension": "straw man",
+    "circular reasoning": "begging the question",
+    "ad populum": "ad populum",
 }
+
+# LOGIC mixes glossary entries, quiz questions and sentence fragments in with real
+# arguments. These are not label noise — they are not arguments at all, and training
+# on them would teach the model to extract structure from text that has none.
+NOT_AN_ARGUMENT = [
+    # quiz scaffolding
+    "which logical fallacy", "which fallacy", "is an example of which",
+    "what fallacy", "identify the fallacy", "the statement above",
+    # glossary phrasing: describes a fallacy rather than committing one
+    "the claim, as evidence", "this type of", "refers to the", "is a fallacy",
+    "is the fallacy", "fallacy of ", "this fallacy", "occurs when",
+    "encourages the audience", "mentality",
+]
+
+
+def is_argument(text):
+    """Reject glossary entries, quiz questions and fragments."""
+    low = text.lower()
+    return not any(m in low for m in NOT_AN_ARGUMENT)
 
 # Deliberately not imported, with the reason — so this decision is reviewable.
 DROP = {
@@ -71,7 +101,7 @@ def main():
             if lab not in KEEP:
                 dropped[lab] = dropped.get(lab, 0) + 1
                 continue
-            if len(text.split()) < args.min_words:
+            if len(text.split()) < args.min_words or not is_argument(text):
                 short += 1
                 continue
             key = text.lower()
@@ -97,7 +127,8 @@ def main():
     print(f"\ndropped {sum(dropped.values())} rows in unmapped classes:")
     for lab, n in sorted(dropped.items(), key=lambda kv: -kv[1]):
         print(f"  {n:>4}  {lab:<24} {DROP.get(lab, '?')}")
-    print(f"\nalso dropped: {short} under {args.min_words} words, "
+    print(f"\nalso dropped: {short} that were too short or not arguments "
+          f"(glossary entries, quiz questions, fragments), "
           f"{len(seen) - len(rows)} duplicates")
 
 

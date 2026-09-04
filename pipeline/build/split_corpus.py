@@ -47,9 +47,16 @@ for form, rows in sorted(by_form.items()):
         #   gemini       — trusted only where the blind label matched what the
         #                  passage was generated to instantiate
         origin = r.get("origin", "gemini")
-        r["intent_agreement"] = (
-            True if origin in ("template", "logic-human")
-            else r.get("intended_form") == r["label"]["form"])
+        if origin == "template":
+            r["intent_agreement"] = True          # correct by construction
+        elif origin == "logic-human":
+            # A human label is not automatically trustworthy: LOGIC's own tail is
+            # noisy (a bare claim labelled equivocation, a non sequitur labelled
+            # equivocation). Agreement between the human label and Gemini's blind
+            # label is the available check, and per-class rates vary 64-89%.
+            r["intent_agreement"] = r.get("gemini_form") == r["label"]["form"]
+        else:
+            r["intent_agreement"] = r.get("intended_form") == r["label"]["form"]
     agree = [r for r in rows if r["intent_agreement"]]
     disagree = [r for r in rows if not r["intent_agreement"]]
     rng.shuffle(agree)
