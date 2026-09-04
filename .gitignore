@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+
+# Model artifacts — 9.6GB, all regenerable.
+#   adapters:  scripts/run_v2.sh          (Colab T4, ~15 min)
+#   merged:    pipeline/train/merge_adapter.py
+#   mlx:       python -m mlx_lm convert --hf-path models/merged_v2 ...
+models/
+
+# Unrelated to this project — an LLM-routing proxy installed in this directory
+node_modules/
+package.json
+package-lock.json
+
+.DS_Store

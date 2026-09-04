@@ -1,0 +1,26 @@
+[project]
+name = "logical-form-extractor"
+version = "0.2.0"
+description = "Fine-tuned LLM that extracts the logical structure of an argument into JSON"
+requires-python = ">=3.12"
+dependencies = [
+    "google-genai>=2.21",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Local inference on Apple silicon
+local = ["mlx-lm>=0.28"]
+# Merging the LoRA adapter into base weights (CPU, one-off)
+merge = ["torch>=2.14", "transformers>=5.16", "peft>=0.20", "safetensors"]
+# Driving a Colab GPU from the terminal.
+# jupyter_kernel_client is PINNED: google-colab-cli declares it unpinned, and
+# 1.0.2 renamed KernelClient -> JupyterKernelClient, which breaks the CLI on a
+# fresh install with "module has no attribute 'KernelClient'".
+colab = ["google-colab-cli>=0.6", "jupyter_kernel_client==0.15.0"]
+
+[project.scripts]
+logicalform = "lfx.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lfx*"]
