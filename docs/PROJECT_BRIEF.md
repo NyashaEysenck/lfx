@@ -294,3 +294,148 @@ conjunction of benefits, not alternatives. The field is a useful self-check.
 model-reviewed form changes (`ind_causal_001` generalization→causal, `fallacy_005`
 disjunctive syllogism→false dilemma) and the one flagged judgment call
 (`editorial_002` ad hominem→other).
+
+---
+
+## Schema v1.2 — align with Duke "Think Again" (planned, 2026-09-04)
+
+The v1 enum was built from a misattribution: the brief credited Duke with "the five
+common inductive forms (generalization, analogy, causal, sign, authority)". That is
+the argumentation-textbook list, not Duke's. Think Again III actually teaches
+generalization, **application of a generalization**, **inference to the best
+explanation**, analogy, and causal. Syllabi checked 2026-09-04.
+
+### Enum changes: 17 -> 22 forms
+
+REMOVE (1)
+- `sign` — merge into inference to the best explanation. All 23 records are
+  observed-indicator -> underlying-condition (spectral lines -> atmosphere,
+  charcoal -> wildfire, evidence-destruction -> guilt), which is IBE in Duke's
+  framing. Relabel, do not delete.
+
+KEEP (reversing an earlier call)
+- `authority` — Duke files Appeals to Authority under Think Again IV fallacies, but
+  the lesson teaches legitimate vs illegitimate appeals rather than rejecting the
+  form. v1 does extraction, not evaluation, so the form stands.
+
+ADD — inductive (2)
+- `inference to the best explanation` — observation needs explaining; hypothesis
+  explains it; no rival explains it as well; therefore probably true. Expected to
+  absorb the 23 `sign` records and part of `other`.
+- `application of generalization` — "most Fs are G; a is an F; so a is probably G".
+  The INVERSE of `generalization` (sample -> population). Distinguished from
+  `categorical syllogism` by the quantifier: "all" is deductive and certain, "most"
+  is inductive and probable. The current model has no slot for this — a test case
+  returned `inductive` + `other`, correctly refusing categorical syllogism and then
+  having nowhere to go.
+
+ADD — fallacies from Duke Think Again IV (4), all available in `data/logic/`
+- `ad populum` (Appeals to Popular Opinion) — 232 available
+- `begging the question` (Circularity) — 171 available
+- `straw man` (Attacking a Straw Man) — 141 available, LOGIC calls it
+  `fallacy of extension`
+- `equivocation` — 49 available, the only class where supply is the constraint
+
+STILL OUT OF SCOPE
+- Truth tables, Venn diagrams, probability/Bayes, decision theory (Think Again II
+  and III): computation over a formalised argument, not extraction from prose.
+- Assuring / guarding / discounting markers (Think Again I): Duke's most
+  distinctive apparatus and a good fit for this model's strong half, but it is
+  span-tagging, i.e. a schema SHAPE change rather than an enum edit. Revisit after
+  v1.2.
+- Slippery slope, vagueness, self-sealers, silencers: no clean source. LOGIC's
+  `faulty generalization` contains slippery slopes but as an unlabelled mixture.
+
+### Plan
+
+Phase 1 — schema + relabel what exists. No new data, no GPU.
+  Update `lfx/schema.py` and the labeler instruction in `lfx/vertex.py` with
+  definitions and precedence for the new forms. Re-label the existing `sign`,
+  `other` and `analogy` records (~80) under v1.2 and measure what redistributes.
+  The question to answer: how much of `other` is actually IBE?
+
+Phase 2 — import the 4 fallacy classes from LOGIC.
+  Extend `KEEP` in `pipeline/corpus/import_logic.py`. VERIFY EXTENSIONS BY READING
+  PASSAGES FIRST — the `faulty generalization` error cost a wrong recommendation.
+  Then blind-label extraction fields via `label_logic.py` and check the
+  gemini/human agreement per class the way ad hominem (87%) and false dilemma (79%)
+  were checked.
+
+Phase 3 — generate IBE and application-of-generalization.
+  No dataset covers either. Use the stratified generator plus blind labelling plus
+  triage, NOT templates: the v2 run showed templates score 18/18 on templated text
+  and 2/6 on natural prose.
+
+Phase 4 — rebalance, split, retrain, evaluate.
+  WATCH THE FALLACY RATIO. The corpus is already 39% fallacies (326/840). Adding
+  four classes at cap 60 would push it past 50%, and a corpus that is half
+  fallacies will bias the model toward predicting them. Cap the imported classes
+  lower — 40 rather than 60 — and put the surplus in `extra_test_human.jsonl`,
+  which is the more valuable destination anyway.
+
+Phase 5 — the part that needs a human.
+  `test_real` has 12 `other` records out of 34. Under v1.2 several are probably
+  IBE, and those gold labels have to be re-reviewed by hand: it is the only split
+  with human-verified labels and real prose, and its value depends on that.
+
+### Success criteria
+
+- `other` shrinks on test_real (currently 12/34, and 7 of the 16 form errors)
+- the 4 new fallacy classes reach the 76-82% that ad hominem and false dilemma hit
+- `application of generalization` separates cleanly from `categorical syllogism`
+- overall form accuracy on `extra_test_human` (n=293) does not regress below 0.775
+
+---
+
+## Phase 0 — source search, and what it settled (2026-09-04)
+
+Searched for real-prose examples of the two formal fallacies, because five classes
+in the corpus are 73-80% template data and templates were measured not to transfer
+(18/18 on templated text, 2/6 on prose).
+
+| source | size | formal fallacies | license | verdict |
+|--------|------|------------------|---------|---------|
+| LOGIC (Jin 2022) | 2,449 | none | NONE declared | already imported |
+| LogicClimate | 1,079 | none | NONE declared | unused, real journalism |
+| MAFALDA (Helwe 2024) | 200 texts / 272 spans | none | CC-BY-SA | ADOPT AS TEST SET |
+| Argotario (Habernal 2017) | 1,344 | none | — | REJECT |
+| LogiQA 2.0 | 8,678 | none | NONE | reject |
+| ReClor | LSAT/GMAT MCQ | none | NONE | reject |
+| Open logic textbooks | — | yes | CC-BY / CC-BY-NC-SA | optional, low value |
+
+**The finding: no public dataset labels formal fallacies in natural prose, and this
+is not an oversight.** Fallacy datasets are built from Reddit, news and
+crowdsourcing, where annotators tag ad hominem, straw man, false dilemma and ad
+populum. Affirming the consequent barely appears because people rarely commit it
+cleanly in real writing — it is a pedagogical category that lives in textbooks,
+which is why textbooks are the only source. The corpus is template-heavy on those
+classes because the real-world signal is scarce, not because the search was lazy.
+
+Why the rejects were rejected:
+- **Argotario** records both the writer's intended fallacy and a second player's
+  guess. Agreement is 31% against ~17% chance for six classes. Samples confirm it:
+  "If you fight once you will never stop fighting" is labelled hasty generalization
+  (it is a slippery slope); "Because gorillas may make people frightened" is not an
+  argument at all.
+- **LogiQA 2.0** annotates multi-label REASONING TYPE (Categorical / Sufficient
+  Conditional / Disjunctive / Conjunctive), not argument form — "Sufficient
+  Conditional Reasoning" covers modus ponens and affirming the consequent
+  identically. Passages are constraint puzzles, not arguments.
+- **ReClor** is LSAT/GMAT multiple choice with no license.
+
+### Decisions taken
+
+1. **Formal fallacies stay synthetic.** Cap their share instead of chasing prose
+   that does not exist. They are currently 45% of training data for a phenomenon
+   the real world rarely produces, which is backwards. Do not claim prose
+   performance on `affirming the consequent` / `denying the antecedent`.
+2. **Shift weight to Duke's informal fallacies, where real data exists** —
+   ad populum (232), circular reasoning (171), straw man (141), equivocation (49)
+   in `data/logic/`. These are also what actually turns up in op-eds.
+3. **Adopt MAFALDA as an external test set**, not training data. 200 expert
+   annotated real-prose passages under a real licence, independent of this
+   project's generator, labeller and reviewer — the only genuinely external check
+   available. Overlaps 7 of our classes.
+4. **Optionally mine open logic textbooks** for formal-fallacy examples. Toy-sized
+   like the templates, but different toys: modest syntactic variety, low effort,
+   low priority.
