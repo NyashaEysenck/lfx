@@ -53,6 +53,7 @@ def load(path, origin=None):
 
 
 pool = (load("data/interim/corpus_all.jsonl")
+        + load("data/interim/fill_labeled.jsonl", "gemini")
         + load("data/interim/logic_labeled_v12.jsonl", "logic-human")
         + load("data/interim/formal_generated.jsonl", "template")
         + load("data/interim/disjunctive_generated.jsonl", "template"))

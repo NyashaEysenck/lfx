@@ -534,3 +534,41 @@ Result: 709 records, 630 surplus human-labelled records to `extra_test_human.jso
 
 Fallacies are 51% of the corpus, still too high. Filling the work order fixes this
 on its own: at 45 across all 22 classes, the 9 fallacy classes would be 41%.
+
+### Phase 3 result — 278 prose records generated, corpus balanced
+
+Generated prose (NOT templates) for the 13 under-filled classes via
+`pipeline/corpus/gen_fill.py`, then blind-labelled and triaged.
+
+**Intent vs blind label: 227/278 = 82%** (the original corpus managed 79%).
+
+  application of generalization  42/42  100%     categorical syllogism   11/13  85%
+  inference to best explanation   8/8   100%     generalization          26/33  79%
+  analogy / hasty gen / authority       96%      disjunctive syllogism    7/10  70%
+  hypothetical syllogism         21/22   95%     affirming the consequent 7/10  70%
+  reductio ad absurdum           19/22   86%     denying the antecedent   6/11  55%
+                                                 other                   12/36  33%
+
+`application of generalization` scored 42/42. The class hinges entirely on a
+quantifier — "most Swedes ... probably Lutheran" is inductive, "all men ... is
+mortal" is a categorical syllogism — and spelling that out in the generation brief
+("NEVER 'all' or 'every'; the conclusion must be hedged") produced a clean split
+from `categorical syllogism` on the first attempt.
+
+`other` remains the problem class at 33%, scattering to IBE (8), categorical
+syllogism (5), application of generalization (5), causal (4). Under v1.2 it means
+"chains crossing KINDS of inference", and neither the generator nor the labeller
+hits that reliably. **`other` may not be a learnable class as defined** — worth
+watching in Phase 4 rather than fixing with more generation.
+
+### Corpus v1.2 final
+
+  945 records, all 22 forms present, 18 classes at 40-45
+  origins: gemini 597, logic-human 261, template 87
+  TEMPLATE SHARE 9% overall, 36-45% in its heaviest classes (was 38% overall,
+    73-80% in five classes — the composition problem that motivated Phases 0-3)
+  fallacies 42% (was 51%)
+  only `other` is materially short, at 24
+
+Remaining work order is trivial (1-7 records for eight classes) except `other`,
+which needs 21 and is 33%-reliable to generate.
