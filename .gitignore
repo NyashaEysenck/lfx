@@ -6,10 +6,11 @@
 __pycache__/
 *.egg-info/
 
-# Model artifacts — 9.6GB, all regenerable.
-#   adapters:  scripts/run_v2.sh          (Colab T4, ~15 min)
+# Model artifacts — all regenerable.
+#   adapters:  scripts/run_3b.sh          (Colab T4, ~36 min for the 3B)
 #   merged:    pipeline/train/merge_adapter.py
-#   mlx:       python -m mlx_lm convert --hf-path models/merged_v2 ...
+#   mlx:       python -m mlx_lm convert --hf-path models/merged_3b \
+#                     --mlx-path models/mlx_3b_8bit -q --q-bits 8
 models/
 
 # Unrelated to this project — an LLM-routing proxy installed in this directory

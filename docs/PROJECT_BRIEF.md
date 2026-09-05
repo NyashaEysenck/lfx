@@ -633,3 +633,63 @@ schema. Corpus work has stopped being the lever. What remains:
     `other` has resisted every attempt to make it learnable, from the 53% pilot
     through to 12/36 generation agreement and 1/4 test accuracy
 Those are three different projects. Choose deliberately rather than drifting.
+
+### Phase 5 — model capacity was a real lever. Qwen2.5-3B beats v4.
+
+Same corpus, same splits, same recipe (6 epochs, r=16, effective batch 8): only the
+base model changed, 1.5B -> 3B. 558 steps, 36 minutes on a free T4.
+
+**Form accuracy on the 512 human-labelled passages, never trained on:**
+
+| form                 | n   | 3B    | v4    | delta  |
+|----------------------|-----|-------|-------|--------|
+| straw man            |  56 | 0.804 | 0.536 | +0.268 |
+| false dilemma        |  53 | 0.887 | 0.774 | +0.113 |
+| ad hominem           | 209 | 0.742 | 0.651 | +0.091 |
+| ad populum           | 114 | 0.781 | 0.719 | +0.061 |
+| begging the question |  80 | 0.700 | 0.863 | -0.163 |
+| OVERALL              | 512 | 0.766 | 0.699 | +0.066 |
+
+Schema validity 0.994 vs 0.955; argument_type 0.809 vs 0.771; premise F1 0.719 vs
+0.688. Every aggregate metric moved the same direction.
+
+`test_real` read 0.529 against v4's 0.412 -- 18/34 vs 14/34. Still not a signal.
+That split has now read 0.529 in four of five runs across corpora differing in
+size, balance, provenance and schema. **Stop quoting it.**
+
+**What the capacity actually bought:** the confusion cluster, not general ability.
+3B recovered 16 ad hominem that v4 called begging the question and 12 it called
+straw man. Straw man was v4's worst class and competes directly with ad hominem;
+3B nearly resolves the pair.
+
+**What it cost:** begging the question -> equivocation, 10 cases, plus 6 to straw
+man. `equivocation` is the class v1.2 introduced and v4 could barely express at
+all. The larger model learned it well enough to over-apply it. That is a class
+BOUNDARY problem, not a capacity one, and it is the single largest remaining
+block: fixing it alone would put 3B above 0.80.
+
+**Eval loss stayed misleading.** 3B bottoms at epoch 2 (0.173, below the 1.5B's
+0.201) and rises to 0.337 by epoch 6 -- yet epoch 6 is the checkpoint that scores
+0.766. Token-level loss and form accuracy diverge on this task in both model
+sizes. Early stopping on eval loss would have cost the gain a third time.
+
+### The free-tier Colab ceiling, measured
+
+A free T4 lives about **55 minutes**. Two runs confirmed it (14:22->15:23,
+15:35->16:30), both reclaimed mid-prediction.
+
+  setup, deps, upload   ~10 min
+  training               36 min
+  predictions           >20 min   <- never fits
+
+Predictions cannot complete on Colab free. The pipeline now downloads the adapter
+the moment training ends (`pack_3b.py` + `run_3b.sh`), and predictions run locally
+against the MLX build. One 3B adapter was lost to learning this.
+
+Three further hardening fixes, each from a real failure this phase:
+  - jobs run DETACHED on the VM (`lfjob.py`); the local side only polls, so a dead
+    terminal no longer kills a run -- the failure that cost three earlier runs
+  - the poller tolerates a transient `exec` error instead of exiting; that error
+    pruned the session record and orphaned a VM we could no longer address
+  - the job-control module is NOT named `joblib.py`: /content is on sys.path, and
+    that name shadowed the real joblib, breaking sklearn and so transformers
