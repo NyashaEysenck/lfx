@@ -856,3 +856,41 @@ ruler, not the model.
 signal for that label, so they behave like the `sign` records did -- close to
 unwinnable. test_real is already too small to resolve anything; this is one more
 reason to retire it rather than repair it.
+
+### The prompt now travels with the weights
+
+Generating the prompt from `FORMS` fixed the drift, then immediately caused a
+worse version of it. Editing `SYSTEM` silently re-specifies every model already
+shipped. Measured on test_real, the packaged 3B given the new v2.0 wording:
+
+  form accuracy   0.559 -> 0.265
+  schema valid    1.000 -> 0.853
+
+The weights did not change. A prompt is a single source of truth only for models
+trained against that version of it.
+
+So `package.py` writes `prompt.txt` into the model directory and
+`lfx.prompts.for_model` reads it back; `cli.py` and `predict_mlx.py` use the
+model's own prompt, not the repo's current one. Re-running the 3B through the
+restored path returns 0.559 and 1.000 exactly, matching its stored predictions.
+
+Packaging was three hand-typed commands before this, which is how the prompt came
+adrift in the first place. It is now one script, and freezing the prompt is a step
+inside it rather than something to remember.
+
+### Work order before the retrain: `other` has no training signal
+
+  train    other = 0 of 712
+  test_gen other = 4
+  test_real other = 12
+
+Dropping the 24 unstable records took every `other` example out of training. A
+model retrained today could not emit the label at all, so an appeal to ignorance
+or a sorites would be forced into the nearest wrong class -- `other` becomes the
+next `sign`, a label in the schema that no model can produce.
+
+The escape hatch needs roughly 40 real arguments whose form genuinely is not among
+the 22: appeal to ignorance, continuum fallacy, tu quoque, gambler's fallacy,
+amphiboly. Two are already in the corpus (the leprechauns record and the
+therapist/placebo one), both found in real prose, so this is collectable rather
+than hypothetical.

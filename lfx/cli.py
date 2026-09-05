@@ -15,7 +15,7 @@ import json
 import sys
 
 from lfx.jsonio import extract_json
-from lfx.prompts import SYSTEM
+from lfx.prompts import for_model
 from lfx.schema import FAMILY, forms_of, inconsistency
 
 # 3B over the 1.5B v4: 0.766 vs 0.699 form accuracy on the 512 human-labelled
@@ -79,7 +79,8 @@ def main():
 
     from mlx_lm import generate, load                 # imported late: ~1s, skip it for --help
     model, tok = load(args.model)
-    sys_msg = SYSTEM
+    # the prompt this model was trained with, not the repo's current one
+    sys_msg = for_model(args.model)
 
     def run(passage):
         msgs = [{"role": "system", "content": sys_msg},

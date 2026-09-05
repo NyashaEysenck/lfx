@@ -31,3 +31,22 @@ SYSTEM = (
     "no other form applies. "
     "Return only the JSON object."
 )
+
+
+def for_model(model_dir):
+    """The prompt a given model was TRAINED with, not whatever the repo holds now.
+
+    A prompt is only a single source of truth for models trained against that
+    version of it. Editing SYSTEM silently re-specifies every model already
+    shipped: when the v2.0 enum replaced the v1.2 one, the packaged 3B -- trained
+    on the old wording -- dropped from 0.559 to 0.265 form accuracy and from 1.000
+    to 0.853 schema validity on test_real, measured. The weights had not changed
+    at all.
+
+    So the prompt travels WITH the weights. `package.py` writes prompt.txt into the
+    model directory; inference reads it back. A directory without one predates this
+    and falls back to the current SYSTEM.
+    """
+    import pathlib
+    p = pathlib.Path(model_dir) / "prompt.txt"
+    return p.read_text() if p.is_file() else SYSTEM

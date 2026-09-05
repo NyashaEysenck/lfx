@@ -7,7 +7,7 @@ merging and quantization, which is the thing being measured.
 """
 import argparse, json
 from lfx.jsonio import extract_json
-from lfx.prompts import SYSTEM
+from lfx.prompts import for_model
 from mlx_lm import generate, load
 
 ap = argparse.ArgumentParser()
@@ -18,7 +18,9 @@ args = ap.parse_args()
 
 rows = [json.loads(l) for l in open(f"data/splits/{args.split}.jsonl")]
 model, tok = load(args.model)
-sys_msg = SYSTEM
+# the prompt this model was trained with, not the repo's current one -- see
+# lfx.prompts.for_model for what changing SYSTEM under a shipped model costs
+sys_msg = for_model(args.model)
 
 with open(args.out, "w") as fh:
     for i, r in enumerate(rows, 1):
