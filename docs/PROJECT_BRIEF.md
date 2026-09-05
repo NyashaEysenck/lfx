@@ -572,3 +572,64 @@ watching in Phase 4 rather than fixing with more generation.
 
 Remaining work order is trivial (1-7 records for eight classes) except `other`,
 which needs 21 and is 33%-reliable to generate.
+
+### Phase 4 — v3 regressed, v4 fixed it. v4 is the default.
+
+**v3 regressed on real prose** despite the corpus work, because of a design error:
+the uniform per-class cap of 45 treated a human-labelled real-prose passage and a
+template as interchangeable, and cut ad hominem and false dilemma from ~80 records
+to 45. Those are the two classes with the most abundant human-labelled prose in the
+corpus. Balance is worth having because it stops the model learning a prior instead
+of a task — it is not worth paying for by discarding the best data available.
+
+**Fix: origin-aware caps.** human-labelled <= 60, generated <= 45, template <= 18
+(and templates only fill what prose could not). That restores the v2 recipe —
+ad hominem 80, false dilemma 86 — while keeping all 22 classes and a 9% template
+share.
+
+**Also fixed: a silent evaluation bug.** `extra_test_human.jsonl` held 630 lines for
+571 unique ids, and `evaluate.py` keys on id, so 59 records were dropped from every
+score reported against it. The merge now deduplicates. All numbers below use the
+corrected 512-record set, so the v3 figures here are lower than those first
+reported for v3.
+
+**Form accuracy on 512 real human-labelled passages, never trained on:**
+
+| class                | v2 (old set) | v3    | v4    | n   |
+|----------------------|--------------|-------|-------|-----|
+| ad hominem           | 0.760        | 0.445 | 0.651 | 209 |
+| false dilemma        | 0.824        | 0.321 | 0.774 |  53 |
+| begging the question | -            | 0.600 | 0.863 |  80 |
+| ad populum           | -            | 0.728 | 0.719 | 114 |
+| straw man            | -            | 0.500 | 0.536 |  56 |
+| OVERALL              | -            | 0.525 | 0.699 | 512 |
+
+v2's column is not strictly comparable: it was measured on a 2-class set that still
+carried the duplicate-id bug. v4 reaches near-v2 accuracy on the shared classes
+while also separating `straw man`, which competes directly with ad hominem.
+
+**Diagnostic cases — 4 of 5 pass, two of them for the first time:**
+
+  PASS  affirming the consequent   (rain/sidewalk — wrong in every previous version)
+  PASS  denying the antecedent
+  PASS  categorical syllogism
+  PASS  equivocation               (a class v2 could not express at all)
+  FAIL  false dilemma -> disjunctive syllogism   (the project's most stubborn confusion)
+
+**test_real (n=34) reads 0.412 against v3's 0.529.** That is 14/34 versus 18/34 — a
+four-example difference on a 34-record set, which is not a signal. The 512-record
+human set is the number to quote.
+
+**CLI default switched to `models/mlx_v4_8bit`.**
+
+### The finding that outlasts this phase
+
+`test_real` form accuracy has now read 0.529, 0.529, 0.529 and 0.412 across four
+training runs on corpora differing in size (284 to 741), balance, provenance and
+schema. Corpus work has stopped being the lever. What remains:
+  - the ~12% Gemini labelling noise floor (measured in Phase 1)
+  - the capacity of a 1.5B base model
+  - `form` being genuinely underdetermined for condensed philosophical prose —
+    `other` has resisted every attempt to make it learnable, from the 53% pilot
+    through to 12/36 generation agreement and 1/4 test accuracy
+Those are three different projects. Choose deliberately rather than drifting.

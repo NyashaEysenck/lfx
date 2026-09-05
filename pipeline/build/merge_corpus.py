@@ -31,9 +31,22 @@ import json
 import random
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--cap", type=int, default=45, help="max records per form")
-ap.add_argument("--template-frac", type=float, default=0.4,
-                help="max share of a class that may be template-built")
+# Caps are ORIGIN-AWARE, and that is the point. A uniform cap of 45 was tried and
+# regressed the two best-measured classes on real prose: ad hominem 0.76 -> 0.63 and
+# false dilemma 0.82 -> 0.54, because it cut their training data from ~80 to 45.
+# Those are the classes with the MOST abundant human-labelled real prose in the
+# corpus, and balance is not worth paying for by discarding them. Balance earns its
+# keep by stopping the model learning a prior instead of a task — it is not a
+# virtue in itself.
+ap.add_argument("--cap", type=int, default=45,
+                help="max GENERATED records per form")
+# 60 reproduces the v2 recipe that scored 0.76 / 0.82 on those classes: roughly
+# 60 human plus ~20 generated. 90 was tried and pushed the fallacy share to 55%,
+# since every human-labelled class here happens to be a fallacy.
+ap.add_argument("--human-cap", type=int, default=60,
+                help="max human-labelled records per form")
+ap.add_argument("--template-cap", type=int, default=18,
+                help="max template records per form — these do not transfer to prose")
 ap.add_argument("--out", default="data/interim/corpus_v12.jsonl")
 ap.add_argument("--surplus", default="data/splits/extra_test_human.jsonl")
 ap.add_argument("--seed", type=int, default=20260904)
@@ -73,31 +86,41 @@ for r in dedup:
     by_form[r["label"]["form"]].append(r)
 
 kept, surplus, short = [], [], []
-tmpl_cap = max(1, int(args.cap * args.template_frac))
 
 for form, rows in by_form.items():
+    human = [r for r in rows if r.get("origin") == "logic-human"]
     tmpl = [r for r in rows if r.get("origin") == "template"]
-    other = [r for r in rows if r.get("origin") != "template"]
-    rng.shuffle(tmpl)
-    rng.shuffle(other)
+    gen = [r for r in rows if r.get("origin") not in ("logic-human", "template")]
+    for lst in (human, tmpl, gen):
+        rng.shuffle(lst)
 
-    # non-template first, then top up with templates within their sub-cap
-    take_other = other[: args.cap]
-    room = args.cap - len(take_other)
-    take_tmpl = tmpl[: min(room, tmpl_cap)]
-    chosen = take_other + take_tmpl
+    take_human = human[: args.human_cap]
+    take_gen = gen[: args.cap]
+    # templates only fill what real prose could not
+    room = max(0, args.cap - len(take_gen))
+    take_tmpl = tmpl[: min(room, args.template_cap)]
+
+    chosen = take_human + take_gen + take_tmpl
     kept += chosen
-
-    leftover = other[len(take_other):]
-    surplus += [r for r in leftover if r.get("origin") == "logic-human"]
+    surplus += human[len(take_human):]          # spare human labels -> external test
+    target = args.cap + (args.human_cap if human else 0)
     if len(chosen) < args.cap:
-        share = len(take_tmpl) / max(len(chosen), 1)
-        short.append((form, len(chosen), args.cap - len(chosen), share))
+        short.append((form, len(chosen), args.cap - len(chosen),
+                      len(take_tmpl) / max(len(chosen), 1)))
 
 rng.shuffle(kept)
 with open(args.out, "w") as fh:
     for r in kept:
         fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+# Deduplicate: the surplus previously shipped 630 lines for 571 unique ids, and
+# evaluate.py keys on id, so 59 records were silently dropped from every score.
+seen_ids, uniq = set(), []
+for r in surplus:
+    if r["id"] in seen_ids:
+        continue
+    seen_ids.add(r["id"])
+    uniq.append(r)
+surplus = uniq
 with open(args.surplus, "w") as fh:
     for r in surplus:
         fh.write(json.dumps(r, ensure_ascii=False) + "\n")

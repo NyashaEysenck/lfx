@@ -24,7 +24,7 @@ import json
 import random
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--generated", default="data/interim/corpus_all.jsonl")
+ap.add_argument("--generated", default="data/interim/corpus_v12.jsonl")
 ap.add_argument("--real", default="data/interim/labeled_reviewed.jsonl")
 ap.add_argument("--seed", type=int, default=20260902)
 ap.add_argument("--val-frac", type=float, default=0.15)

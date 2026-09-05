@@ -21,7 +21,7 @@ from lfx.schema import FAMILY, inconsistency
 # 8-bit over 4-bit: same speed class (~0.6s/passage), perfect schema validity on
 # test_real, better suppressed-premise accuracy. 4-bit scored 1 example lower on
 # form accuracy out of 34 — not resolvable at that sample size.
-DEFAULT_MODEL = "models/mlx_v2_8bit"
+DEFAULT_MODEL = "models/mlx_v4_8bit"
 
 def looks_like_argument(text):
     """Reject input the model would only hallucinate over.
