@@ -62,7 +62,7 @@ run_job () {  # run_job <launch-script> <label>
   done
 }
 
-run_job scripts/colab_steps/launch_3b.py       "fine-tune Qwen2.5-3B, 6 epochs on 741 examples"
+run_job scripts/colab_steps/launch_3b.py       "fine-tune Qwen2.5-3B, 6 epochs on the v2.0 corpus"
 # Pull the adapter down BEFORE the prediction step. Training is the expensive
 # part and a lost runtime must never cost it again.
 echo "==> securing the adapter"

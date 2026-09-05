@@ -18,14 +18,19 @@ from lfx.jsonio import extract_json
 from lfx.prompts import for_model
 from lfx.schema import FAMILY, forms_of, inconsistency
 
-# 3B over the 1.5B v4: 0.766 vs 0.699 form accuracy on the 512 human-labelled
-# passages, and it largely untangles straw man from ad hominem (0.536 -> 0.804),
-# the pair v4 confused most. Costs roughly double the size and per-query time.
+# v5 over the earlier 3B: the same 0.765 form accuracy on the 485 human-labelled
+# passages, but measured honestly (three of that set's straw man records had leaked
+# into training) and better on every other field — argument_type 0.842 vs 0.816,
+# premise F1 0.743 vs 0.718. It also speaks schema v2.0, so its `form` is a list.
+#
+# 3B over the 1.5B v4: 0.765 vs 0.699 form accuracy, largely untangling straw man
+# from ad hominem, the pair v4 confused most. Costs roughly double the size and
+# per-query time.
 #
 # 8-bit over 4-bit: same speed class (~0.6s/passage), perfect schema validity on
 # test_real, better suppressed-premise accuracy. 4-bit scored 1 example lower on
 # form accuracy out of 34 — not resolvable at that sample size.
-DEFAULT_MODEL = "models/mlx_3b_8bit"
+DEFAULT_MODEL = "models/mlx_v5_8bit"
 
 def looks_like_argument(text):
     """Reject input the model would only hallucinate over.
