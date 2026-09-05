@@ -927,3 +927,46 @@ two cat-sweaters, three phone-bill variants).
 
 51 kept. Corpus 1088 records, `other` at 53 -- in line with the other classes,
 where before it was 26 records nobody could label twice the same way.
+
+### Phase 8 — the last four human-labelled classes
+
+  ad hominem     81   98%      false dilemma  87   75%
+  ad populum     60   80%      straw man      62   58%
+
+`ad hominem` at 98% is the cleanest class in the corpus. `straw man` at 58% is
+mostly the Gemini blind spot already measured on the test set -- 8 of its 26
+disagreements are `ad hominem`, which is predictable because straw-manning
+usually attacks the person too. The gold is right on those.
+
+`false dilemma -> disjunctive syllogism` showed up 7 times, the project's most
+stubborn confusion appearing in the LABELS rather than in a model. Those are
+genuinely contested ("Either determinism is true, or human beings possess genuine
+free will" is arguably exhaustive) and were left alone rather than churned.
+
+**The useful find was 20 more non-arguments**, surfaced because the blind labeler
+asked for `other` on them:
+
+  "assumes that if many people act or believe a certain way, it must be the right way"
+  "This persuasive technique is used to make you feel left out if you don't join the group."
+  ", rather than on his arguments or opinions."
+  "What is the name of the fallacy in question 4 about Marcus?"
+
+Plus one real relabel: "Red had come up six times in a row on the roulette wheel,
+so Greg knew it was close to certain black would come up next" was filed as
+`ad populum`. It is a gambler's fallacy -- no form in the enum names it, so it is
+`other`, which is what the escape hatch is for.
+
+**The glossary filter is now scoped to LOGIC-sourced text.** Applied to the whole
+corpus it discarded three real generated arguments, because its patterns are
+ordinary English and only signal a definition in a source that mixes definitions
+with instances:
+
+  "Battery OCCURS WHEN one intentionally causes harmful contact... the defendant
+   deliberately shoved the victim"        -> a categorical syllogism, not a definition
+  "Overwatering often causes root rot for THIS TYPE OF plant"
+                                          -> a real hasty generalization
+  "Florentine artists quickly adopted THIS TECHNIQUE"   -> a real appeal to authority
+
+A filter justified by one source's defects must be applied only to that source.
+
+Corpus 1068 records, 22 classes, `other` at 54. train 707, val 159.

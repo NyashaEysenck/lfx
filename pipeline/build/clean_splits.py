@@ -31,7 +31,7 @@ import sys
 sys.path.insert(0, "pipeline/corpus")
 from import_logic import is_argument  # noqa: E402
 
-from lfx.schema import INDUCTIVE_FORMS, inconsistency, schema_ok  # noqa: E402
+from lfx.schema import INDUCTIVE_FORMS, forms_of, inconsistency, schema_ok  # noqa: E402
 
 # v1.2 merged `sign` into IBE: every record it held was observed-indicator ->
 # underlying-condition, which is IBE in Duke's framing.
@@ -50,14 +50,14 @@ for path in sorted(pathlib.Path(args.splits).glob("*.jsonl")):
     kept, dropped, retitled, repaired = [], [], [], []
 
     for r in rows:
-        if not is_argument(r["text"]):
+        if not is_argument(r["text"], r.get("origin")):
             dropped.append(r)
             continue
-        form = r["label"]["form"]
-        if form in RETIRED_FORMS:
-            want = RETIRED_FORMS[form]
+        forms = forms_of(r["label"])
+        if any(f in RETIRED_FORMS for f in forms):
+            want = [RETIRED_FORMS.get(f, f) for f in forms]
             r = dict(r, label=dict(r["label"], form=want, argument_type="inductive"))
-            retitled.append((r["id"], form, want))
+            retitled.append((r["id"], " + ".join(forms), " + ".join(want)))
         kept.append(r)
 
     # Five corpus records carry an inductive form with argument_type "deductive",
@@ -67,9 +67,9 @@ for path in sorted(pathlib.Path(args.splits).glob("*.jsonl")):
     # so the type is the field that moves.
     for r in kept:
         if inconsistency(r["label"]):
-            want = "inductive" if r["label"]["form"] in INDUCTIVE_FORMS else "deductive"
+            want = "inductive" if forms_of(r["label"])[0] in INDUCTIVE_FORMS else "deductive"
             r["label"] = dict(r["label"], argument_type=want)
-            repaired.append((r["id"], r["label"]["form"], want))
+            repaired.append((r["id"], " + ".join(forms_of(r["label"])), want))
 
     bad = [r["id"] for r in kept
            if not schema_ok(r["label"]) or inconsistency(r["label"])]

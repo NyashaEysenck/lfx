@@ -67,6 +67,10 @@ NOT_AN_ARGUMENT = [
     "is called a", "the fallacy committed",
     # quiz prompts whose answer slot is the label itself
     "is an example of", "above is an example of", "example of:",
+    # fourth pass: found by the four-class audit, where the blind labeler asked
+    # for `other` on records that turned out to be glossary entries again
+    "this persuasive technique", "this trick", "what is the name of the fallacy",
+    "when a statement falsely", "assumes that if many people",
 ]
 
 
@@ -86,8 +90,20 @@ DEFINITION_OPENERS = (
     "the belief that", "assuming that",
 )
 
-def is_argument(text):
-    """Reject glossary entries, quiz questions and fragments."""
+def is_argument(text, origin="logic-human"):
+    """Reject glossary entries, quiz questions and fragments.
+
+    Scoped to LOGIC-sourced text. The patterns are ordinary English -- "occurs
+    when", "this technique", "this type of" -- and they are evidence of a glossary
+    entry only because LOGIC mixes definitions in with instances. Generated prose
+    uses them innocently, and applying the list to it discards real arguments:
+    "Battery occurs when one intentionally causes harmful contact... the defendant
+    deliberately shoved the victim" is a categorical syllogism, not a definition,
+    and "Overwatering often causes root rot for this type of plant" is a real
+    hasty generalization. Both were caught before this scoping.
+    """
+    if origin not in (None, "logic-human"):
+        return True
     low = text.lower()
     if any(m in low for m in NOT_AN_ARGUMENT):
         return False
