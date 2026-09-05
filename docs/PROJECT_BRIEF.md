@@ -970,3 +970,34 @@ with instances:
 A filter justified by one source's defects must be applied only to that source.
 
 Corpus 1068 records, 22 classes, `other` at 54. train 707, val 159.
+
+### Rebuilding the splits — three leaks found
+
+**Do not re-run `merge_corpus.py`.** It rebuilds from the original interim
+sources, which would discard every Phase 6-8 correction. `corpus_v20` is already
+the capped, corrected corpus; it is split directly.
+
+**Leak 1: 4 records were in both the corpus and the held-out human set** (3 unique
+passages, one duplicated inside the corpus). All `straw man` -- LOGIC carries the
+same passage under different ids, so it landed on both sides. Every straw man
+score on that set was inflated by 3 of 56 memorised records, about 5%. The 3B's
+0.804 is really nearer 0.75-0.78; still far above v4's 0.536, so the Phase 5
+conclusion holds, but the number should be quoted with this attached.
+
+**Leak 2: 2 passages landed in both train and val** on the first split, again the
+same text under different ids. Text-level dedup now runs BEFORE the split rather
+than after, since afterwards the duplicates are already on opposite sides.
+
+**Leak 3: 46 ids were shared with the held-out set** with zero text overlap -- the
+collision-renaming from Phase 6 meeting a set that kept its original ids.
+Harmless today, silent mis-scoring tomorrow, because `evaluate.py` joins on id.
+New split ids are now made unique against the held-out files.
+
+**And the lesson that cost the most time:** `clean_splits.py` fixed the splits in
+place, and the fixes did not survive a re-split. The splitter regenerates
+`test_real` from `labeled_reviewed.jsonl`, so the retired `sign` labels came
+straight back and the v2.0 migration was undone -- test_real briefly held 34
+invalid records. **A fix belongs upstream of the generator, not on its output.**
+
+Splits: train 741, val 160, test_gen 160, test_real 34, extra_test_human 485.
+No text or id overlap between any pair; every label valid.
