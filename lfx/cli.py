@@ -16,7 +16,7 @@ import sys
 
 from lfx.jsonio import extract_json
 from lfx.prompts import SYSTEM
-from lfx.schema import FAMILY, inconsistency
+from lfx.schema import FAMILY, forms_of, inconsistency
 
 # 3B over the 1.5B v4: 0.766 vs 0.699 form accuracy on the 512 human-labelled
 # passages, and it largely untangles straw man from ad hominem (0.536 -> 0.804),
@@ -51,10 +51,14 @@ def render(d, colour=True):
         out.append(f"  {C(f'P{i}', '2;37')}  {p}")
     out.append(f"  {C('∴ ', '1;36')} {C(d.get('conclusion', ''), '1')}")
     out.append("")
-    form = d.get("form", "?")
-    fam = FAMILY.get(form, "")
-    tag = C(form, "1;31" if "FALLACY" in fam.upper() else "1;36")
-    out.append(f"  {d.get('argument_type', '?')} · {tag}" + (f"  {C(f'({fam})', '2;37')}" if fam else ""))
+    forms = forms_of(d) or ["?"]
+    # A chain names each move in order; the family shown is the first one's, since
+    # that is the argument's central move.
+    fam = FAMILY.get(forms[0], "")
+    tags = " + ".join(
+        C(f, "1;31" if "FALLACY" in FAMILY.get(f, "").upper() else "1;36") for f in forms)
+    out.append(f"  {d.get('argument_type', '?')} · {tags}"
+               + (f"  {C(f'({fam})', '2;37')}" if fam else ""))
     if d.get("suppressed_premise"):
         out.append(f"  {C('unstated:', '2;37')} {d['suppressed_premise']}")
     if (bad := inconsistency(d)):

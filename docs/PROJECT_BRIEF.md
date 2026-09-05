@@ -777,3 +777,82 @@ The second nearly caused a bad edit: keying decisions by id alone relabelled bot
 halves of logic_0096, including a passage nobody had audited. Decisions are now
 matched on id AND text, and anything that cannot be pinned to exactly one record
 is refused rather than applied to both.
+
+### Phase 7 — schema v2.0: `form` becomes a list
+
+A single-value `form` could not describe a multi-step argument. "Forty of the
+Swedes I met were Lutheran, so most Swedes are; so Sven probably is" performs a
+generalization AND an application of one; whichever the annotator wrote down
+became the only correct answer, so a model reading the passage correctly scored
+as wrong. Those records were pushed into `other`, which then meant two unrelated
+things -- "several forms apply" and "no form applies". `equivocation` had already
+shown what a double-meaning label does to a class.
+
+  form = ["generalization", "application of generalization"]   several apply
+  form = ["other"]                                             none applies
+
+Nearly every record holds one form, where set equality is the same comparison
+v1.2's string equality made. Re-scoring the 3B and v4 predictions after the
+migration returned 0.765 and 0.672 -- identical to before. **The schema change is
+measurement-neutral**, so every number from earlier phases stays comparable.
+
+**A drift bug found on the way in.** `lfx/prompts.py`, whose own docstring says
+"single source of truth -- change it in one place or not at all", still carried
+the v1.0 enum written out by hand. Every model from v1.2 onward was trained,
+evaluated and shipped with a prompt offering the deleted `sign` and never
+mentioning `straw man`, `ad populum`, `begging the question`, `equivocation`,
+`application of generalization` or `inference to the best explanation` -- four of
+which are classes in the main test set. The models learned them from the training
+targets while being told a label space that did not contain them. The prompt is
+now BUILT from `FORMS` and cannot drift again.
+
+**Two things the build itself taught us:**
+
+  - The labeler cannot invent chains from prose rules. Given rules alone it
+    returned single forms for every multi-step passage except the one written
+    verbatim in its instruction. It needed few-shot examples -- the same lesson as
+    "templates don't generalize", one level up.
+  - The consistency rule was wrong as first written. Requiring argument_type to
+    suit EVERY form in a chain immediately rejected a real argument: night shifts
+    -> poor sleep -> clinical error is causal and inductive, while "a hospital must
+    not adopt such a policy, so withdraw the rota" is a deductive modus tollens.
+    Real chains mix families; forbidding that only moves the single-value
+    bottleneck from `form` to `argument_type`. On a chain, argument_type now
+    describes how the argument as a whole presents its conclusion.
+
+### The `other` class is not labelable, measured
+
+The 26 `other` passages were labelled twice at temperature 0, changing nothing but
+adding two chain examples to the few-shot. **65% of the labels changed**, and only
+5 of the 17 changes were the intended single->chain effect. The rest were single
+form -> a DIFFERENT single form, which the change had nothing to do with:
+
+  inference to the best explanation -> modus ponens
+  categorical syllogism            -> authority
+  authority                        -> other
+  causal                           -> other  /  other -> causal
+
+**The control shows this is specific to `other`, not the labeler.** The same test
+over 60 records from six well-defined classes flipped 13%, and six of those eight
+were the chain examples working as intended -- ~3% genuine instability.
+
+  ad hominem 16/16    categorical syllogism 10/10    analogy 9/9
+  generalization 4/5  modus ponens 8/11              causal 5/9
+
+Sharply-defined classes are perfectly stable. The fuzzier inductive ones are less
+so, which is exactly where the schema's own boundaries are softest. For `other`
+the answer is driven by prompt context rather than by the text.
+
+So the 24 GENERATED `other` records are dropped: re-labelling them would inject
+noise, and keeping them teaches the model to answer `other` for arguments that are
+not unnameable. The 2 logic-human ones stay -- adjudicated by a person in Phase 6,
+an appeal to ignorance and a continuum fallacy, which is what `other` is now for.
+
+Corpus v2.0: 1037 records. train 712, val 159. Test splits untouched: removing
+held-out records on the strength of a labelling experiment would be adjusting the
+ruler, not the model.
+
+**Still open:** test_real holds 12 `other` records and now has almost no training
+signal for that label, so they behave like the `sign` records did -- close to
+unwinnable. test_real is already too small to resolve anything; this is one more
+reason to retire it rather than repair it.

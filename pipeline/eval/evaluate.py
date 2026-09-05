@@ -18,7 +18,7 @@ import json
 import sys
 from difflib import SequenceMatcher
 
-from lfx.schema import schema_ok
+from lfx.schema import forms_of, is_chain, schema_ok
 
 MATCH = 0.6          # SequenceMatcher ratio above which two premises are "the same"
 
@@ -72,22 +72,48 @@ def score(gold_path, pred_path):
 
         if p is None:
             m["json_invalid"] += 1
-            per_form[gl["form"]][1] += 1
+            per_form[" + ".join(forms_of(gl))][1] += 1
+            m[("chain" if is_chain(gl) else "single") + "_n"] += 1
             continue
         m["json_valid"] += 1
+        # Predictions made under v1.2 hold `form` as a bare string. Coerce them to
+        # the v2.0 shape for scoring so historical runs stay comparable; a model
+        # trained under v1.2 is judged by whether it produced a valid v1.2 label,
+        # which is what it was asked for. Nothing else about the record changes.
+        if isinstance(p.get("form"), str):
+            p = dict(p, form=[p["form"]])
+            m["legacy_coerced"] += 1
         if not schema_ok(p):
             m["schema_invalid"] += 1
-            per_form[gl["form"]][1] += 1
+            per_form[" + ".join(forms_of(gl))][1] += 1
+            m[("chain" if is_chain(gl) else "single") + "_n"] += 1
             continue
         m["schema_valid"] += 1
 
         m["type_correct"] += p["argument_type"] == gl["argument_type"]
-        ok = p["form"] == gl["form"]
-        m["form_correct"] += ok
-        per_form[gl["form"]][0] += ok
-        per_form[gl["form"]][1] += 1
-        if not ok:
-            confusion[(gl["form"], p["form"])] += 1
+        # v2.0 scores the form SET. Nearly every record holds one form, where set
+        # equality is the same comparison v1.2 made -- so these numbers stay
+        # comparable across the schema change. Only a chain can now be fully
+        # right, where before whichever form the annotator wrote down was the one
+        # correct answer and the model was marked wrong for naming the other.
+        gforms, pforms = forms_of(gl), forms_of(p)
+        okf = set(gforms) == set(pforms)
+        m["form_correct"] += okf
+        # Chains are reported separately: they are the records a single-value
+        # field could not express, so they are where this change should show.
+        bucket = "chain" if is_chain(gl) else "single"
+        m[f"{bucket}_n"] += 1
+        m[f"{bucket}_correct"] += okf
+        # Partial credit, reported but never used as the headline: on a chain,
+        # naming one of two forms is more useful than naming neither.
+        if gforms:
+            sums["form_jaccard"] += (len(set(gforms) & set(pforms))
+                                     / len(set(gforms) | set(pforms)))
+        key = " + ".join(gforms)
+        per_form[key][0] += okf
+        per_form[key][1] += 1
+        if not okf:
+            confusion[(key, " + ".join(pforms))] += 1
 
         _, _, f1 = premise_prf(gl["premises"], p["premises"])
         sums["premise_f1"] += f1
@@ -100,6 +126,9 @@ def score(gold_path, pred_path):
             m["supp_both"] += 1
 
     ok = max(m["schema_valid"], 1)
+    if m["legacy_coerced"]:
+        print(f"  note: {pred_path} holds {m['legacy_coerced']} v1.2-shaped labels "
+              f"(form as a string); coerced to a one-element list for scoring")
     return {
         "n": n,
         "json_valid": m["json_valid"] / n,
@@ -110,6 +139,10 @@ def score(gold_path, pred_path):
         # cases scores better on them by shrinking its own denominator.
         "form_acc_e2e": m["form_correct"] / n,
         "form_acc": m["form_correct"] / ok,
+        "form_jaccard": sums["form_jaccard"] / ok,
+        "single_acc": m["single_correct"] / max(m["single_n"], 1),
+        "chain_acc": m["chain_correct"] / max(m["chain_n"], 1),
+        "chain_n": m["chain_n"],
         "type_acc": m["type_correct"] / ok,
         "premise_f1": sums["premise_f1"] / ok,
         "conclusion_sim": sums["conclusion_sim"] / ok,
@@ -122,11 +155,16 @@ def main():
     gold_path, pred_paths = sys.argv[1], sys.argv[2:]
     results = [(p, *score(gold_path, p)) for p in pred_paths]
 
-    keys = ["json_valid", "schema_valid", "form_acc_e2e", "form_acc", "type_acc",
+    keys = ["json_valid", "schema_valid", "form_acc_e2e", "form_acc",
+            "single_acc", "chain_acc", "form_jaccard", "type_acc",
             "premise_f1", "conclusion_sim", "supp_presence_acc", "supp_sim"]
     labels = {"json_valid": "JSON parses", "schema_valid": "schema valid",
               "form_acc_e2e": "FORM ACC (end-to-end)",
-              "form_acc": "form acc | schema ok", "type_acc": "argument_type accuracy",
+              "form_acc": "form acc | schema ok",
+              "single_acc": "  on single-form records",
+              "chain_acc": "  on multi-form chains",
+              "form_jaccard": "form overlap (partial credit)",
+              "type_acc": "argument_type accuracy",
               "premise_f1": "premise F1", "conclusion_sim": "conclusion similarity",
               "supp_presence_acc": "suppressed present/absent", "supp_sim": "suppressed similarity"}
 

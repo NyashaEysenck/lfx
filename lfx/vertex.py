@@ -19,7 +19,7 @@ PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "agentic-school-506719")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 MODEL = "gemini-2.5-flash"
 
-from lfx.schema import FORMS  # noqa: E402
+from lfx.schema import FORMS, MAX_FORMS  # noqa: E402
 
 RESPONSE_SCHEMA = {
     "type": "OBJECT",
@@ -27,7 +27,10 @@ RESPONSE_SCHEMA = {
         "premises": {"type": "ARRAY", "items": {"type": "STRING"}},
         "conclusion": {"type": "STRING"},
         "argument_type": {"type": "STRING", "enum": ["deductive", "inductive"]},
-        "form": {"type": "STRING", "enum": FORMS},
+        # v2.0: a list, so a multi-step argument can name every move it makes
+        # instead of being forced into one value or dumped into `other`.
+        "form": {"type": "ARRAY", "items": {"type": "STRING", "enum": FORMS},
+                 "minItems": 1, "maxItems": MAX_FORMS},
         "suppressed_premise": {"type": "STRING", "nullable": True},
     },
     "required": ["premises", "conclusion", "argument_type", "form", "suppressed_premise"],
@@ -50,7 +53,8 @@ Field rules:
 - argument_type: "deductive" if the conclusion is presented as following with
   necessity; "inductive" if presented as probable or well-supported. A formally
   invalid argument that is *presented* as necessary is still "deductive".
-- form: the named pattern.
+- form: an ARRAY of the named patterns the argument performs, most central
+  first. One entry for a single-step argument; see rules 5-7 for multi-step ones.
     * Valid deductive: modus ponens, modus tollens, hypothetical syllogism,
       disjunctive syllogism, categorical syllogism (quantified premises about
       classes, e.g. "All A are B; s is A; so s is B"), reductio ad absurdum
@@ -124,18 +128,20 @@ Field rules:
   4. EVIDENCE-TO-CONDITION IS IBE, NOT CAUSAL. If the conclusion says the evidence
      indicates some condition obtains, that is inference to the best explanation.
      Reserve "causal" for a conclusion that asserts one thing CAUSES another.
-  5. A CHAIN OF THE SAME KIND IS THAT KIND, NOT "other". A passage that runs
-     several steps of ONE sort of inference takes that form's name. A four-step
-     causal chain (cycling -> exercise -> energy -> concentration -> better work)
-     is "causal", not "other" — length alone does not make an argument
-     unclassifiable, and "causal" tells the reader more.
-  6. "other" IS FOR CHAINS THAT CROSS KINDS. Reserve it for a passage combining
-     DIFFERENT sorts of inference, where no single form covers the whole thing:
-     Aquinas running a causal chain, THEN a no-infinite-regress step, THEN an
-     identification with God; or a general principle, THEN a subsumption, THEN a
-     normative conclusion. Note the test is the KIND of step, not the number of
-     steps. A causal chain ending in a normative "therefore we should..." crosses
-     kinds and IS "other"; a causal chain ending in a causal claim is "causal".
+  5. A CHAIN OF THE SAME KIND IS ONE FORM. A passage running several steps of ONE
+     sort of inference takes that form's name, once. A four-step causal chain
+     (cycling -> exercise -> energy -> concentration -> better work) is
+     ["causal"] — length alone does not add entries.
+  6. A CHAIN THAT CROSSES KINDS LISTS EACH FORM, most central first. "Forty of
+     the Swedes I met were Lutheran, so most Swedes are; so Sven probably is"
+     performs two different moves and is
+     ["generalization", "application of generalization"]. A causal chain ending
+     in a normative "therefore we should..." lists both moves. Give at most three,
+     and only forms the passage actually performs — do not pad the list.
+  7. "other" MEANS NO FORM IN THE LIST APPLIES. It is the escape hatch for a real
+     argument this vocabulary cannot name — an appeal to ignorance, a continuum
+     fallacy. It is NOT for multi-step arguments: those name their moves under
+     rule 6. Return ["other"] alone, never beside another form.
 - suppressed_premise: an unstated assumption the argument needs in order to work.
   Give exactly one, the load-bearing one. Use null if the argument is complete as
   stated. Do not pad this field.
@@ -160,6 +166,29 @@ def build_examples(path):
     return turns
 
 
+def normalize_forms(label):
+    """Repair form-list constraints the API response schema cannot express.
+
+    `minItems`/`maxItems`/`enum` are enforced by the schema; "no duplicates" and
+    "`other` never sits beside a real form" are not, and the labeler does violate
+    the latter -- it returned ["inference to the best explanation", "other"],
+    which reads as "this is IBE, and also unnameable".
+
+    Applied to LABELER output only, never to model predictions: training data must
+    be clean, but a model's output has to be measured as it actually came out or
+    schema validity stops meaning anything.
+    """
+    forms = label.get("form")
+    if isinstance(forms, str):
+        forms = [forms]
+    if not isinstance(forms, list):
+        return label
+    seen = [f for i, f in enumerate(forms) if f not in forms[:i]]
+    if len(seen) > 1:
+        seen = [f for f in seen if f != "other"] or ["other"]
+    return dict(label, form=seen[:MAX_FORMS])
+
+
 def label_one(cl, examples, text, retries=3):
     """Label one passage. Retries with backoff; raises if all attempts fail."""
     contents = examples + [types.Content(role="user", parts=[types.Part(text=text)])]
@@ -172,7 +201,7 @@ def label_one(cl, examples, text, retries=3):
     for attempt in range(retries):
         try:
             resp = cl.models.generate_content(model=MODEL, contents=contents, config=config)
-            return json.loads(resp.text)
+            return normalize_forms(json.loads(resp.text))
         except Exception as exc:  # noqa: BLE001 - surface anything, retry, then give up
             if attempt == retries - 1:
                 raise

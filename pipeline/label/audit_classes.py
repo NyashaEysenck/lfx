@@ -26,6 +26,7 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
+from lfx.schema import forms_of
 from lfx.vertex import build_examples, client, label_one
 
 ap = argparse.ArgumentParser()
@@ -44,7 +45,7 @@ args = ap.parse_args()
 rows = [json.loads(l) for l in open(args.corpus)]
 if args.classes:
     targets = {c.strip() for c in args.classes.split(",") if c.strip()}
-    todo = [r for r in rows if r["label"]["form"] in targets]
+    todo = [r for r in rows if targets & set(forms_of(r["label"]))]
     scope = ", ".join(sorted(targets))
 else:
     todo, scope = list(rows), "all classes"
@@ -90,10 +91,12 @@ print(f"\nlabeled {len(labeled)}/{len(todo)}\n")
 per = collections.defaultdict(lambda: [0, 0])
 confusion = collections.defaultdict(collections.Counter)
 for r in labeled:
-    human, gem = r["label"]["form"], r["gemini_form"]
+    # compare as SETS: a v2.0 label is a list, and order carries no meaning here
+    human = " + ".join(forms_of(r["label"]))
+    gem = " + ".join(forms_of(r["gemini_label"]))
     per[human][0] += 1
-    per[human][1] += human == gem
-    if human != gem:
+    per[human][1] += set(forms_of(r["label"])) == set(forms_of(r["gemini_label"]))
+    if set(forms_of(r["label"])) != set(forms_of(r["gemini_label"])):
         confusion[human][gem] += 1
 
 print(f"{'class':26}{'n':>5}{'agree':>8}")
