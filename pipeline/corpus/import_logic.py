@@ -57,6 +57,11 @@ NOT_AN_ARGUMENT = [
     "the claim, as evidence", "this type of", "refers to the", "is a fallacy",
     "is the fallacy", "fallacy of ", "this fallacy", "occurs when",
     "encourages the audience", "mentality",
+    # second pass: found by adjudicating contested records, where glossary text is
+    # over-represented. Only ~0.7% of the whole import, but free to exclude.
+    "name that fallacy", "name the fallacy", "this tactic", "this technique",
+    "this strategy", "an argument that", "a statement that", "is committed when",
+    "is used when", "such arguments", "the speaker/author", "definition:",
 ]
 
 
