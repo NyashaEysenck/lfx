@@ -894,3 +894,36 @@ the 22: appeal to ignorance, continuum fallacy, tu quoque, gambler's fallacy,
 amphiboly. Two are already in the corpus (the leprechauns record and the
 therapist/placebo one), both found in real prose, so this is collectable rather
 than hypothetical.
+
+### The escape hatch, rebuilt from real prose
+
+`other` went from 0 training records to 53, drawn from the LOGIC classes Phase 2
+deliberately did NOT import *because they had no counterpart in our enum* -- which
+is exactly the property the escape hatch needs.
+
+  appeal to emotion     "Professor, PLEASE reconsider my grade. I only answered 7%
+                        of the questions correctly, but I need this to graduate."
+  fallacy of relevance  "I know you want to imprison me for murdering my parents,
+                        but judge, have mercy -- I'm an orphan!"
+  intentional           "I believe in God because no one can prove a god doesn't
+                        exist." (appeal to ignorance)
+
+**`false causality` was excluded although it is the largest of the four (203
+records).** Our `causal` is the VALID inductive form, so filing post hoc examples
+under `other` would teach the model that causal-looking text is unnameable -- and
+`causal` was already among the least stable classes in the Phase 7 control (5/9).
+That is the shape of the `faulty generalization` error: a class whose NAME
+suggests a mapping its EXTENSION does not support.
+
+Two filters. The blind labeler had to agree the record was `other` -- 67 of 134
+did, and the survivors came out evenly split across the three sources (22/23/22),
+which is what matters: `other` must mean "none of the 22 apply", not "emotional
+appeal". A single-source escape hatch would rebuild the double-meaning problem
+that made the class unlearnable in the first place. Then a human read all 67 and
+excluded 16: glossary definitions written as bare noun phrases that `is_argument`
+cannot catch, descriptions of adverts rather than arguments, one quiz prompt, and
+five near-duplicates (the moon short-ribs/spare-ribs pair, two invisible-unicorns,
+two cat-sweaters, three phone-bill variants).
+
+51 kept. Corpus 1088 records, `other` at 53 -- in line with the other classes,
+where before it was 26 records nobody could label twice the same way.
