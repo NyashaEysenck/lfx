@@ -62,13 +62,36 @@ NOT_AN_ARGUMENT = [
     "name that fallacy", "name the fallacy", "this tactic", "this technique",
     "this strategy", "an argument that", "a statement that", "is committed when",
     "is used when", "such arguments", "the speaker/author", "definition:",
+    # third pass: quiz prompts that name the answer slot rather than argue
+    "this logical fallacy is called", "this fallacy is called",
+    "is called a", "the fallacy committed",
+    # quiz prompts whose answer slot is the label itself
+    "is an example of", "above is an example of", "example of:",
 ]
 
+
+# A shape-based rule was tried here and removed: rejecting text that starts
+# lower-case or lacks terminal punctuation flagged 12.9% of the held-out set, and
+# inspection showed most were real arguments that merely lack a full stop
+# ("We know God exists because he made everything") or open lower-case
+# ("iPhones are the best phone because everyone has them."). Those two properties
+# are common in this corpus and carry no signal. What actually separates a
+# definition from an argument is its PHRASING, so the list above does the work.
+
+# Dictionary-style openings: a gerund or noun phrase defining a fallacy rather
+# than committing one -- "Doing something because everyone else is doing it".
+DEFINITION_OPENERS = (
+    "claiming that", "appealing to", "the use of", "use of", "an appeal to",
+    "doing something because", "using ", "the act of", "the practice of",
+    "the belief that", "assuming that",
+)
 
 def is_argument(text):
     """Reject glossary entries, quiz questions and fragments."""
     low = text.lower()
-    return not any(m in low for m in NOT_AN_ARGUMENT)
+    if any(m in low for m in NOT_AN_ARGUMENT):
+        return False
+    return not low.lstrip().startswith(DEFINITION_OPENERS)
 
 # Deliberately not imported, with the reason — so this decision is reviewable.
 DROP = {

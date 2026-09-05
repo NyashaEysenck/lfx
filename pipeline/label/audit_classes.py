@@ -21,6 +21,7 @@ merge and split like any other label. Held-out records are never edited here.
 import argparse
 import collections
 import json
+import random
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -30,20 +31,32 @@ from lfx.vertex import build_examples, client, label_one
 ap = argparse.ArgumentParser()
 ap.add_argument("--corpus", default="data/interim/corpus_v12.jsonl")
 ap.add_argument("--fewshot", default="data/raw/fewshot.jsonl")
-ap.add_argument("--classes", required=True, help="comma-separated form names")
+ap.add_argument("--classes", help="comma-separated form names; default all")
+ap.add_argument("--sample", type=int,
+                help="audit a random sample of this many, for measuring a set's "
+                     "label noise rather than correcting it")
+ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--out", default="data/interim/audit_classes.jsonl")
 ap.add_argument("--workers", type=int, default=4)
 ap.add_argument("--limit", type=int)
 args = ap.parse_args()
 
-targets = {c.strip() for c in args.classes.split(",") if c.strip()}
 rows = [json.loads(l) for l in open(args.corpus)]
-todo = [r for r in rows if r["label"]["form"] in targets]
+if args.classes:
+    targets = {c.strip() for c in args.classes.split(",") if c.strip()}
+    todo = [r for r in rows if r["label"]["form"] in targets]
+    scope = ", ".join(sorted(targets))
+else:
+    todo, scope = list(rows), "all classes"
+if args.sample and args.sample < len(todo):
+    # A seeded sample so the estimate is reproducible and cannot be quietly
+    # re-drawn until it says something convenient.
+    todo = random.Random(args.seed).sample(todo, args.sample)
+    scope += f" (random sample of {args.sample}, seed {args.seed})"
 if args.limit:
     todo = todo[: args.limit]
 
-print(f"{len(rows)} records in corpus; auditing {len(todo)} in "
-      f"{', '.join(sorted(targets))}\n")
+print(f"{len(rows)} records in {args.corpus}; auditing {len(todo)}: {scope}\n")
 
 cl = client()
 examples = build_examples(args.fewshot)

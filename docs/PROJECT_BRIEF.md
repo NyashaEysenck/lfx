@@ -693,3 +693,87 @@ Three further hardening fixes, each from a real failure this phase:
     pruned the session record and orphaned a VM we could no longer address
   - the job-control module is NOT named `joblib.py`: /content is on sys.path, and
     that name shadowed the real joblib, breaking sklearn and so transformers
+
+### Phase 6 — auditing the labels, and checking the ruler
+
+**The equivocation/begging-the-question leak was a data defect, not a boundary.**
+Of 44 equivocation training records, about half were equivocation. The rest were
+straw man, appeals to authority, a sorites, and passages that are not arguments.
+The smallest class in the corpus was also the noisiest, so it acted as an
+attractor for anything involving restatement or word-play -- which is what
+circular arguments look like.
+
+Blind-relabelled both classes (`audit_classes.py`): 75% agreement on begging the
+question, 64% on equivocation. Every disagreement was adjudicated by a human;
+Gemini's answer was adopted only where a human agreed. It was wrong on the two
+cleanest equivocations in the corpus -- "only man is rational, no women is man"
+and the rare-steak pun -- which is the argument for a human queue over an
+automatic overwrite.
+
+Result: 6 dropped as not arguments, 15 relabelled, 5 human labels confirmed.
+equivocation 44 -> 31, begging the question 61 -> 54.
+
+**Then the ruler itself was checked** -- a 100-record seeded sample of the 512
+held-out human records, blind-labelled the same way. 23 disagreements, all 23
+adjudicated:
+
+  gold correct, Gemini wrong   11
+  gold wrong                    8
+  genuinely contested           4
+
+So the held-out set carries roughly **8-12% label error**, and every score quoted
+against it should be read as "against gold that is itself about 90% right".
+
+Straw man read 50% agreement, which looked alarming because straw man is where
+the 3B gained most (0.536 -> 0.804). Reading the seven disagreements reversed
+that: four are genuine straw men that Gemini called `ad hominem` -- a predictable
+confusion, since straw-manning usually attacks the person too -- and the 3B
+agreed with the gold on all four. The low agreement measures Gemini's blind spot,
+not the test set's.
+
+**Two defects removed, both properties of the text or the schema rather than of
+any prediction, so neither can flatter a model:**
+
+  - 43 quiz prompts and dictionary definitions across the splits (5.3% of the
+    held-out set): "Doing something because everyone else is doing it",
+    "...What fallacy has Louise committed? http://www.funtrivia.com". No model can
+    extract an argument from a question about arguments.
+  - 2 records in test_real still labelled `sign`, deleted by schema v1.2. No model
+    trained since has seen that label, so 6% of a 34-record split was unwinnable.
+
+A shape-based detector was tried for the first and REMOVED: rejecting text that
+starts lower-case or lacks terminal punctuation flagged 12.9% of the held-out set,
+and most were real arguments that merely lack a full stop ("We know God exists
+because he made everything"). Both properties are common here and carry no
+signal. Definitions are distinguished by their PHRASING, so phrase and opener
+matching does the work, at 5.3% with no false positives on inspection.
+
+**Corrected scores on the cleaned sets:**
+
+  extra_test_human (485)   3B 0.765   v4 0.700
+  test_real (34)           3B 0.559   v4 0.471   -- still 19 vs 16, still noise
+
+The held-out numbers barely moved, which is itself worth knowing: the models were
+scoring on those quiz prompts, having learned the same prompt-to-label
+association from equivalent items in training. Removing them costs nothing and
+removes a way of being right for the wrong reason.
+
+**A bias this set cannot escape:** the model trains on labels from the same
+annotators it is tested against, so part of what 0.765 measures is agreement with
+LOGIC's house style rather than correctness. A genuinely independent test set
+would need different annotators.
+
+### Two latent bugs, found by a guard rather than looked for
+
+  - 5 records carry an inductive form with `argument_type: deductive`. Four are in
+    train.jsonl, so every model from v2 through the 3B trained on labels that
+    contradict themselves -- the same defect `inconsistency()` reports the model
+    emitting at 0-2%.
+  - 15 ids each name TWO DIFFERENT passages. `evaluate.py` keys on id and was
+    silently dropping one of every pair; the splitter could put one id on both
+    sides of the train/test line.
+
+The second nearly caused a bad edit: keying decisions by id alone relabelled both
+halves of logic_0096, including a passage nobody had audited. Decisions are now
+matched on id AND text, and anything that cannot be pinned to exactly one record
+is refused rather than applied to both.
