@@ -1,0 +1,52 @@
+FROM /private/tmp/claude-501/-Users-nganda-Desktop-mine-new/6ab8f440-5f12-4b8c-ac49-1efc7322b591/scratchpad/lfx-3b-f16.gguf
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+{{ .Response }}<|im_end|>
+"""
+
+SYSTEM """Extract the logical structure of the argument into JSON with keys: premises (array of strings), conclusion (string), argument_type ("deductive" or "inductive"), form (array of 1-3 strings, each one of: modus ponens, modus tollens, hypothetical syllogism, disjunctive syllogism, categorical syllogism, reductio ad absurdum, generalization, application of generalization, inference to the best explanation, analogy, causal, authority, affirming the consequent, denying the antecedent, ad hominem, hasty generalization, false dilemma, ad populum, begging the question, straw man, equivocation, other), and suppressed_premise (string or null). List one form for a single-step argument. List every form a multi-step argument performs, most central first. Use ["other"] alone, and only when no other form applies. Return only the JSON object."""
+
+PARAMETER temperature 0
+PARAMETER top_p 1
+PARAMETER num_ctx 4096
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+
+LICENSE """Logical Form Extractor — argument structure extraction.
+
+Built with Qwen.
+
+Base model: Qwen/Qwen2.5-3B-Instruct
+Modification: LoRA fine-tune (r=16, alpha=32, 6 epochs), merged into the base
+weights. Adapter: models/lora_3b. Weights are modified from the original.
+
+Qwen is licensed under the Qwen RESEARCH LICENSE AGREEMENT,
+Copyright (c) Alibaba Cloud. All Rights Reserved.
+
+NON-COMMERCIAL USE ONLY. The Qwen Research License permits use, reproduction,
+distribution and derivative works FOR NON-COMMERCIAL PURPOSES ONLY, defined as
+research or evaluation. Full terms:
+https://huggingface.co/Qwen/Qwen2.5-3B-Instruct/blob/main/LICENSE
+
+Training data: the LOGIC dataset (Jin et al., Findings of EMNLP 2022), MIT
+licensed, plus prose generated for this project.
+
+MIT License, Copyright (c) 2022 Zhijing Jin, Abhinav Lalwani, Tejas Vaidhya,
+Xiaoyu Shen, Yiwen Ding, Zhiheng Lyu, Mrinmaya Sachan, Rada Mihalcea,
+Bernhard Schoelkopf. Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including without
+limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions: The
+above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS
+IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+Citation: Jin et al. "Logical Fallacy Detection." Findings of EMNLP 2022,
+7180-7198. https://aclanthology.org/2022.findings-emnlp.532
+"""
