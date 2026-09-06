@@ -46,7 +46,7 @@ run_job () {  # run_job <launch-script> <label>
   while true; do
     # A transient exec failure must not kill the poller: that is what pruned the
     # session record last time, orphaning a VM we could no longer address.
-    out=$(cell scripts/colab_steps/poll_3b.py || true)
+    out=$(cell scripts/colab_steps/poll.py || true)
     if [ -z "$out" ] || grep -q "not found\|Traceback (most recent call last):.*colab" <<<"$out"; then
       echo "    ...transient poll failure, retrying  [$(date +%H:%M:%S)]"; sleep 60; continue
     fi
