@@ -1,4 +1,4 @@
-FROM /private/tmp/claude-501/-Users-nganda-Desktop-mine-new/6ab8f440-5f12-4b8c-ac49-1efc7322b591/scratchpad/lfx-3b-f16.gguf
+FROM /private/tmp/claude-501/-Users-nganda-Desktop-mine-new/6ab8f440-5f12-4b8c-ac49-1efc7322b591/scratchpad/tied.gguf
 
 TEMPLATE """{{ if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
