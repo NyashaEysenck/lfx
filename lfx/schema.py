@@ -67,6 +67,40 @@ REQUIRED_KEYS = {"premises", "conclusion", "argument_type", "form", "suppressed_
 # change, and only chains can now be fully right.
 MAX_FORMS = 3
 
+# STATUS, decided 2026-09-06: the list is UNEXERCISED, deliberately, and that is
+# not an oversight to be fixed later without thinking about it.
+#
+# No split holds a multi-form label, so the model gets no signal to produce one
+# and no gold record can test one. verify.py used to warn about this on every
+# run. An un-actioned warning that fires every time teaches you to skim warnings,
+# which costs more than the thing it warns about, so it now states this decision
+# instead.
+#
+# The reason it stayed empty is worth recording. The list was designed for
+# SEQUENTIAL chains -- generalization, then application of it -- and the corpus
+# turns out to hold almost none. What it holds instead, roughly 116 times, is
+# OVERLAY: one argument that two competent labellers each described correctly
+# with a different single form.
+#
+#   "Either determinism is true, or we possess genuine free will. Our experience
+#    of agency suggests we are not cogs in a deterministic machine, so
+#    determinism must be false. Therefore we have free will."
+#
+# Structurally a `disjunctive syllogism`; the disjunction is false because it
+# excludes compatibilism, so also a `false dilemma`. Neither label is wrong and
+# neither is a step the other follows. The same shape recurs as `begging the
+# question` vs `categorical syllogism`, and `false dilemma` vs `modus tollens`.
+#
+# Those records are currently recorded as labeller DISAGREEMENTS and pushed into
+# train as noise -- see split_corpus.py, which routes contested records there.
+#
+# So the honest next phase is not to manufacture chains. It is to redefine this
+# field as "every form that describes this argument" and mine the disagreements,
+# which are already human-adjudicated. That is deferred, not rejected: it resets
+# every metric in the project and requires re-reviewing gold that currently holds
+# one form per record. Do it as its own phase, against a frozen baseline, or not
+# at all.
+
 
 def forms_of(d):
     """The form list, tolerating a v1.2 record that still holds a bare string."""

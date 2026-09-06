@@ -1001,3 +1001,97 @@ invalid records. **A fix belongs upstream of the generator, not on its output.**
 
 Splits: train 741, val 160, test_gen 160, test_real 34, extra_test_human 485.
 No text or id overlap between any pair; every label valid.
+
+### Phase 9 — the capacity lever, measured honestly
+
+Phase 5 concluded "3B beats 1.5B" from 0.766 vs 0.699. That was measured when 56%
+of val and 55% of test_gen had been in v4's training data, so it was not a number
+about capacity. Qwen2.5-1.5B was retrained on the v2.0 splits with the same recipe
+-- 6 epochs, r=16, alpha=32, same seven target modules -- and both models scored
+through the same MLX 8-bit runtime.
+
+  split              n     1.5B    3B(v5)   gap
+  extra_test_human  485    0.647   0.763   +0.115   McNemar z=5.13
+  test_gen          160    0.781   0.812   +0.031   z=0.66, not significant
+  test_real          34    0.382   0.412   +0.029   too small to resolve
+
+**The lever is conditional, and the old number hid that by averaging over both
+regimes.** On generated prose the two models are indistinguishable: the 3B is
+uniquely right on 21 records, the 1.5B on 16. On real human-written prose the 3B
+is uniquely right on 83 to the 1.5B's 28. Capacity is buying generalisation past
+the generator's habits, not task ability as such.
+
+For scale, against every other lever tried: cleaning the labels moved form
+accuracy 0.765 -> 0.763. Doubling the parameters moves it 0.115.
+
+**Two measurement traps met on the way.** The first table drawn from this run
+compared the 1.5B's VM predictions (bnb 4-bit) against the 3B's local MLX 8-bit
+and reported +0.074 on test_gen. Runtime alone is worth 0.043 there -- the same
+1.5B adapter scores 0.781 via MLX and 0.738 via the VM. A comparison is only a
+comparison when the runtime matches too.
+
+The second: `test_real` said +0.029 and `extra_test_human` said +0.115. At 34
+records one passage moves the metric by 0.029, so the small split cannot resolve
+a difference this size in either direction. Quote the 485-record number.
+
+`run_3b.sh` hardcoded the base model in five places, so comparing sizes meant
+copying five files and trusting nothing else drifted. It is `run_size.sh <tag>
+<base> [epochs]` now, generating the detached-job cells from one argument.
+
+### Licensing — resolved, and both answers were the opposite of what was recorded
+
+**LOGIC is MIT.** The grant is not in the repository -- no LICENSE file, and the
+HuggingFace mirror says "unknown". It is in the paper, Appendix A, in the
+datasheet: "The dataset is open-sourced with the MIT license, and the intended
+use is for academic research but not commercial purposes." This project had
+recorded "no grant of reuse", concluded from the repo's silence without opening
+the appendix.
+
+**Qwen2.5's research licence permits distributing derivatives**; it restricts
+them to non-commercial use, and requires shipping the agreement, marking
+modifications, and displaying "Built with Qwen". Recorded here as a blocker on
+release, from reading a restrictive-sounding tag rather than the terms.
+
+Nothing blocks a non-commercial release. What it needs is notices, which the repo
+had none of -- including for its own code, leaving it exactly where LOGIC was:
+public, with no grant. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+
+MAFALDA shares 27 passages with this corpus. All carry `origin: logic-human`:
+MAFALDA consolidates LOGIC among its sources, so they arrived under MIT rather
+than CC BY-SA. **It is therefore not the independent validation set its SOURCE.md
+claims** -- 19 of its texts are in train/val. Scoring against it would be
+contaminated on roughly 10% of the benchmark.
+
+`test_real` claimed to be condensed from public-domain sources and was not: the
+C.S. Lewis trilemma and King's Letter from Birmingham Jail are both in copyright.
+Replaced with Elijah at Mount Carmel and Frederick Douglass, matched on form and
+category.
+
+### Chains — the multi-form field is parked, and why
+
+`verify.py` warned on every run that no split holds a multi-form label. Nothing
+was ever going to action it, and a warning that always fires trains you to skim
+the ones that matter, so it is now an assertion: the absence is stated, and a
+chain label appearing would fail the check.
+
+**The field stayed empty because v2.0 solved a problem the corpus does not have.**
+The list was designed for SEQUENTIAL chains -- generalization, then application of
+it -- and there are almost none. What the corpus holds instead, about 116 times,
+is OVERLAY: one argument two competent labellers each described correctly with a
+different single form.
+
+  "Either determinism is true, or we possess genuine free will. Our experience of
+   agency suggests we are not cogs in a deterministic machine, so determinism
+   must be false. Therefore we have free will."
+
+Structurally a `disjunctive syllogism`; the disjunction is false because it
+excludes compatibilism, so also a `false dilemma`. Neither label is wrong, and
+neither is a step the other follows. Same shape in `begging the question` vs
+`categorical syllogism`, and `false dilemma` vs `modus tollens`.
+
+Those records are currently filed as labeller disagreements and routed into train
+as noise. So the honest next phase is not to manufacture chains; it is to redefine
+`form` as "every form that describes this argument" and mine the disagreements,
+which are already human-adjudicated. Deferred rather than rejected: it resets
+every metric and requires re-reviewing gold that holds one form per record. Its
+own phase, against a frozen baseline, or not at all.

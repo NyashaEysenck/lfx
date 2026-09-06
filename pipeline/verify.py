@@ -125,14 +125,17 @@ for path in sorted(glob.glob("results/preds_v5_*.jsonl")):
     check(f"{pathlib.Path(path).name} ids align with {split}",
           pids == gids, f"{len(pids - gids)} orphan preds, {len(gids - pids)} missing")
 
-print("\n7. CHAINS — is the v2.0 capability actually exercised?")
+print("\n7. CHAINS — the multi-form field is unexercised, by decision")
+# This used to warn on every run. Nothing was ever going to action it, and a
+# warning that always fires trains you to skim the ones that matter. The state
+# is now asserted instead: if a chain label ever appears, that is a real change
+# and the check fails so someone looks at it. See lfx/schema.py above MAX_FORMS
+# for why the field stayed empty -- the corpus holds overlay, not chains.
 tot = sum(1 for rows in data.values() for r in rows if len(forms_of(r["label"])) > 1)
-if tot == 0:
-    warn("no chain labels in any split",
-         "v2.0 is inert: the model has no signal to produce a multi-form label, "
-         "and no gold record can test one")
-else:
-    check(f"chain labels present: {tot}", True)
+check("no chain labels present, as expected", tot == 0,
+      f"{tot} multi-form labels appeared — the schema note in lfx/schema.py is "
+      f"now out of date; decide whether this is the overlay phase starting"
+      if tot else "field reserved; see lfx/schema.py")
 
 print("\n" + "=" * 62)
 print(f"{len(FAILS)} failed, {len(WARNS)} warnings")
