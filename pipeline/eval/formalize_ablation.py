@@ -38,6 +38,7 @@ import collections
 import concurrent.futures
 import json
 import os
+import random
 import sys
 import time
 
@@ -111,7 +112,7 @@ FORMALIZE_SCHEMA = {
 }
 
 
-def call(cl, model, prompt, schema, retries=5):
+def call(cl, model, prompt, schema, retries=8):
     delay = 4.0
     for attempt in range(retries):
         try:
@@ -129,8 +130,8 @@ def call(cl, model, prompt, schema, retries=5):
                     t in str(e) for t in ("429", "RESOURCE_EXHAUSTED", "503",
                                           "UNAVAILABLE", "empty body")):
                 raise
-            time.sleep(delay)
-            delay *= 2
+            time.sleep(delay + random.random() * 2)
+            delay = min(delay * 2, 60)
 
 
 def main():
