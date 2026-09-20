@@ -1,4 +1,7 @@
-"""Tier 1b: the six valid inductive forms, which no public dataset covers.
+"""Tier 1b: classes whose label can be SPECIFIED but not symbolically verified.
+
+Six valid inductive forms, which no public dataset covers, plus two fallacies that
+are structural enough to construct honestly.
 
 Every corpus in this space annotates FALLACIES. LOGIC, MAFALDA, Argotario, the
 climate sets -- all of them label what went wrong. Nothing labels an argument that
@@ -21,6 +24,21 @@ Tier 1:
            from different families, each labelling blind from the full 22-form
            enum with no knowledge of what was specified
 
+EQUIVOCATION NEEDS A DIFFERENT CHECK, and finding that out is itself a result.
+Asked to classify a constructed equivocation from the 22-form enum, both verifiers
+failed on every item -- calling it `application of generalization` or `modus
+ponens`, i.e. reading the surface structure and not noticing that a term had
+shifted sense. The renders were not at fault; one ran "entry by means of an
+instrument" as a burglary tool in one premise and a forged financial instrument in
+the next, which is as clean an equivocation as a textbook prints.
+
+An open-ended 22-way question has almost no sensitivity here, so it cannot verify
+the class. A targeted one does: the renderer declares which term it equivocated on,
+a verifier is asked only "does any term carry two senses, and which", and the item
+survives if the verifier independently names the same term. Both checks are run and
+both recorded, because the gap between them measures something worth knowing --
+how much of a fallacy's detectability depends on being asked the right question.
+
 Consensus removes idiosyncratic error, not systematic error. If every model shares
 a blind spot, this preserves it -- and one is already documented in this project,
 where Gemini systematically misreads `straw man`. Two independent agreements is
@@ -30,6 +48,23 @@ than as gold.
 What is specified here is the INFERENTIAL MOVE, not the wording. The renderer is
 told the shape of the reasoning and invents everything else, so the label follows
 from the construction rather than from anyone's reading of the result.
+
+TWO FALLACIES ARE INCLUDED, and the line matters. Constructing an `ad hominem` or
+a `straw man` produces a caricature rather than a specimen, because what makes
+those fallacious is the discourse context -- who is being answered, and what they
+actually said. `hasty generalization` and `equivocation` are not like that. Both
+are structural: the first is `generalization` with the sample made too small to
+bear the leap, the second is one term carrying two senses across the premises.
+"Two rude waiters in Paris, so Parisians are rude" is a real instance, not a
+parody of one. So these two are constructible and the other five informal
+fallacies are not.
+
+They are also the two classes with nowhere else to turn. LOGIC's 387 unused
+`faulty generalization` rows cannot fill the first: import_logic.py removed that
+mapping because LOGIC uses the class for any bad inductive leap while ours is the
+narrow one, and Gemini disagreed with the human label on 21 of 33 sampled. MAFALDA
+has both classes but is CC BY-SA, so lifting rows out of it would put a ShareAlike
+obligation on a 1435-record benchmark for the sake of 35.
 
     python pipeline/corpus/build_inductive.py --per-form 4
     python pipeline/corpus/build_inductive.py --per-form 40 --apply
@@ -63,38 +98,53 @@ VERIFIERS = ["gemini-2.5-flash", "gemini-3.1-pro-preview"]
 # neighbouring classes apart. `generalization` and `application of generalization`
 # are the same premise material in opposite directions, and without the exclusion
 # a renderer will write both at once.
+# form -> (argument_type, specification). hasty generalization is a failed
+# induction so the schema requires `inductive`; equivocation is written here as a
+# syllogism whose middle term shifts sense, which is deductive in shape.
 SPECS = {
-    "generalization": (
+    "generalization": ("inductive",
         "Reason FROM several specific observed instances sharing a property TO a "
         "general claim about the wider class they belong to. The sample must be "
         "described as reasonably sized or representative, so the leap is warranted. "
         "Do NOT then apply the general claim back to any individual case."),
-    "application of generalization": (
+    "application of generalization": ("inductive",
         "Reason FROM an established general claim about a class, plus the fact that "
         "a specific individual belongs to that class, TO a probable conclusion about "
         "that individual. The general claim must be stated as already known or "
         "well established -- do NOT derive it from a sample in this argument. The "
         "conclusion must be hedged as probable, not certain."),
-    "inference to the best explanation": (
+    "inference to the best explanation": ("inductive",
         "Reason FROM a puzzling observation, THROUGH the comparative merits of rival "
         "explanations, TO accepting the one that best accounts for it. At least one "
         "competing explanation must be named and set aside as a worse fit. Do NOT "
         "present it as a simple cause-and-effect claim."),
-    "analogy": (
+    "analogy": ("inductive",
         "Reason FROM a similarity between two specific cases in named relevant "
         "respects, and from one case having some further property, TO the other case "
         "probably having that property too. Both cases must be particular, not "
         "classes. Do NOT reason from a sample to a population."),
-    "causal": (
+    "causal": ("inductive",
         "Reason FROM evidence that one factor produces another -- correlation plus a "
         "plausible mechanism, or an intervention -- TO the claim that it does cause "
         "it. Do NOT present rival explanations for comparison, and do NOT infer the "
         "cause merely from temporal order."),
-    "authority": (
+    "authority": ("inductive",
         "Reason FROM the considered judgement of a relevant, identified expert or "
         "body TO accepting the claim they assert. The expertise must be germane to "
         "the claim. Do NOT supply the underlying evidence itself -- the argument's "
         "weight rests on who is saying it."),
+    "hasty generalization": ("inductive",
+        "Reason FROM a sample that is EXPLICITLY too small or unrepresentative -- "
+        "one or two cases, or a plainly skewed source -- TO a sweeping claim about "
+        "the whole class. The inadequacy of the sample must be visible in the text "
+        "(state how few cases, or how they were selected). The conclusion must be "
+        "stated with unwarranted confidence, not hedged."),
+    "equivocation": ("deductive",
+        "Write an argument that LOOKS valid but turns on one word or phrase carrying "
+        "TWO DIFFERENT SENSES in different premises. State the term once in its "
+        "first sense and once in its second, so that the conclusion only follows if "
+        "the two senses are confused. Do not flag the shift or explain it -- the "
+        "argument must read as though it goes through."),
 }
 
 DOMAINS = ["medicine", "climate science", "criminal law", "software engineering",
@@ -118,15 +168,34 @@ THE MOVE
 Set it in {domain}, write it as {register}, ordered {order}.
 
 Hard requirements:
-- The reasoning must be GOOD of its kind -- a reasonable instance of this move, not
-  a flawed one. Do not write a fallacy.
+- The argument must be a genuine instance of exactly this move, written the way a
+  real author would write it -- not a textbook parody of it.
 - Perform this move and no other. Do not add a second inferential step.
 - Never name the form of reasoning, and avoid textbook giveaways ("by analogy",
   "generalising from", "the best explanation is", "appeal to authority").
 - 2 to 5 sentences. Natural writing, not a logic exercise.
 
 Return JSON with: text (the argument prose), premises (each premise as it appears
-in the text), conclusion (the conclusion as it appears in the text)."""
+in the text), conclusion (the conclusion as it appears in the text). If the move
+turns on a term carrying two senses, also return equivocal_term: that term exactly
+as it appears in the text."""
+
+EQUIVOCAL_PROMPT = """Does this argument rely on a word or phrase that carries two \
+DIFFERENT meanings in different parts of it?
+
+If so, name that single word or phrase exactly as it appears, and give the two \
+senses. If no term shifts meaning, return term as an empty string.
+
+ARGUMENT
+{text}"""
+
+EQUIVOCAL_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {"term": {"type": "STRING"},
+                   "sense_a": {"type": "STRING"},
+                   "sense_b": {"type": "STRING"}},
+    "required": ["term"],
+}
 
 CLASSIFY_PROMPT = """Identify the form of reasoning this argument uses.
 
@@ -141,7 +210,10 @@ RENDER_SCHEMA = {
     "type": "OBJECT",
     "properties": {"text": {"type": "STRING"},
                    "premises": {"type": "ARRAY", "items": {"type": "STRING"}},
-                   "conclusion": {"type": "STRING"}},
+                   "conclusion": {"type": "STRING"},
+                   # equivocation only: what the renderer shifted, so a targeted
+                   # verifier can be checked against it rather than trusted
+                   "equivocal_term": {"type": "STRING"}},
     "required": ["text", "premises", "conclusion"],
 }
 CLASSIFY_SCHEMA = {
@@ -175,7 +247,8 @@ def call(cl, model, prompt, schema, temperature, retries=6):
 
 def build_one(cl, args, form, i, seed):
     rng = random.Random(seed)
-    spec = dict(spec=SPECS[form], domain=rng.choice(DOMAINS),
+    arg_type, spec_text = SPECS[form]
+    spec = dict(spec=spec_text, domain=rng.choice(DOMAINS),
                 register=rng.choice(REGISTERS), order=rng.choice(ORDERS))
     for attempt in range(3):
         r = call(cl, args.render_model, RENDER_PROMPT.format(**spec), RENDER_SCHEMA, 1.0)
@@ -191,14 +264,36 @@ def build_one(cl, args, form, i, seed):
                                                       text=r["text"]),
                         CLASSIFY_SCHEMA, 0.0)["form"]
     unanimous = len(set(votes.values())) == 1 and next(iter(votes.values())) == form
+
+    targeted = None
+    if form == "equivocation":
+        # The open-ended question does not find these; a targeted one does. Both
+        # are kept so the gap between them stays visible.
+        term = (r.get("equivocal_term") or "").strip().lower()
+        found = {}
+        for m in args.verifiers:
+            got = call(cl, m, EQUIVOCAL_PROMPT.format(text=r["text"]),
+                       EQUIVOCAL_SCHEMA, 0.0)
+            got_term = (got.get("term") or "").strip().lower()
+            # a head-noun match is enough: "instrument" vs "an instrument"
+            hit = bool(term) and bool(got_term) and (
+                term in got_term or got_term in term)
+            found[m] = {"term": got.get("term"), "senses":
+                        [got.get("sense_a"), got.get("sense_b")], "matches": hit}
+        targeted = {"renderer_term": r.get("equivocal_term"), "verifiers": found,
+                    "unanimous": all(v["matches"] for v in found.values())}
+        unanimous = targeted["unanimous"]
     return {"id": f"ind_{form.replace(' ', '_')}_{i:03d}",
             "text": r["text"], "origin": "constructed", "tier": "1b",
             "target_form": form,
-            "spec": SPECS[form],
+            "spec": spec_text,
             "verifiers": votes,
+            "targeted_check": targeted,
+            "open_ended_unanimous": len(set(votes.values())) == 1
+                                    and next(iter(votes.values())) == form,
             "unanimous": unanimous,
             "label": {"premises": r["premises"], "conclusion": r["conclusion"],
-                      "argument_type": "inductive", "form": [form],
+                      "argument_type": arg_type, "form": [form],
                       "suppressed_premise": None},
             "certain": []}
 
@@ -261,6 +356,14 @@ def main():
         k = sum(1 for x in kept if x["target_form"] == form)
         r = sum(1 for x in rejected if x["target_form"] == form)
         print(f"  {form:34} {k:4} {r:4}")
+
+    eq = [x for x in kept + rejected if x["target_form"] == "equivocation"]
+    if eq:
+        oe = sum(1 for x in eq if x["open_ended_unanimous"])
+        tg = sum(1 for x in eq if (x.get("targeted_check") or {}).get("unanimous"))
+        print(f"\nequivocation, open-ended vs targeted verification:")
+        print(f"  open-ended 22-way question : {oe}/{len(eq)} found")
+        print(f"  targeted 'which term shifts': {tg}/{len(eq)} found")
 
     print("\nwhere the verifiers went instead (rejected items):")
     conf = collections.Counter()

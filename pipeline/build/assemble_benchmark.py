@@ -38,8 +38,13 @@ from lfx.schema import FORMS, FAMILY, forms_of
 
 SOURCES = [
     ("constructed-symbolic", "data/splits/tier1_formal.jsonl", "target_form"),
-    ("constructed-consensus", "data/interim/inductive_tier1b_20260920_181518.jsonl",
-     "target_form"),
+    ("constructed-consensus", "data/interim/inductive_tier1b.jsonl", "target_form"),
+    # hasty generalization and equivocation: the two classes with no usable source.
+    # LOGIC's `faulty generalization` is a different class wearing the same name,
+    # and MAFALDA would put a ShareAlike obligation on the whole benchmark for 35
+    # records. Both are structural enough to construct honestly -- see
+    # build_specified.py on why these two and not the other informal fallacies.
+    ("constructed-consensus", "data/interim/specified_hg_eq.jsonl", "target_form"),
     ("external-human", "data/splits/extra_test_human.jsonl", None),
     ("project-authored", "data/splits/test_real.jsonl", None),
 ]
