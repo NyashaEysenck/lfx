@@ -202,6 +202,11 @@ PATTERNS = [
     ("disjunctive syllogism",    ["_X | _Y", "~_X"],        "_Y"),
     ("disjunctive syllogism",    ["_X | _Y", "~_Y"],        "_X"),
     ("reductio ad absurdum",     ["_X -> (_Y & ~_Y)"],      "~_X"),
+    # The same move split across two conditionals. This is how a reductio is
+    # usually written in prose -- an assumption is shown to entail Q and to entail
+    # not-Q -- and omitting it made the checker reject four correctly formalised
+    # reductios as unrecognisable. The oracle was wrong, not the verifier.
+    ("reductio ad absurdum",     ["_X -> _Y", "_X -> ~_Y"],  "~_X"),
 ]
 
 _COMPILED = [(name, [parse(p) for p in prems], parse(concl))
@@ -391,6 +396,7 @@ def _tests():
         (["P | Q", "~P"],        "Q",      ["disjunctive syllogism"]),
         (["P | Q", "~Q"],        "P",      ["disjunctive syllogism"]),
         (["P -> (Q & ~Q)"],      "~P",     ["reductio ad absurdum"]),
+        (["P -> Q", "P -> ~Q"],  "~P",     ["reductio ad absurdum"]),
         (["P -> Q", "P"],        "P",      ["begging the question"]),
     ]
     for prems, concl, want in cases:

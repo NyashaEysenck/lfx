@@ -77,10 +77,12 @@ ordinary model output and should not be treated as gold for premise F1.
 
 import argparse
 import collections
+import concurrent.futures
 import json
 import os
 import random
 import sys
+import threading
 import time
 
 os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "agentic-school-506719")
@@ -102,15 +104,41 @@ VERIFY_MODEL = "gemini-3.1-pro-preview"
 
 # Skeletons, in the canonical-label language lfx.formal reads. Both valid forms
 # and formal fallacies: the task is naming the shape, not endorsing it.
+# Each form carries one or more skeletons, sampled per item. Variants are not
+# padding: a benchmark whose every reductio has the same shape measures whether a
+# model recognises that shape. `reductio` in particular is written both ways in
+# real prose, and the disjunctive and categorical entries vary which disjunct is
+# denied and which mood is used.
 SKELETONS = {
-    "modus ponens":             ("propositional", ["P -> Q", "P"], "Q"),
-    "modus tollens":            ("propositional", ["P -> Q", "~Q"], "~P"),
-    "affirming the consequent": ("propositional", ["P -> Q", "Q"], "P"),
-    "denying the antecedent":   ("propositional", ["P -> Q", "~P"], "~Q"),
-    "hypothetical syllogism":   ("propositional", ["P -> Q", "Q -> R"], "P -> R"),
-    "disjunctive syllogism":    ("propositional", ["P | Q", "~P"], "Q"),
-    "reductio ad absurdum":     ("propositional", ["P -> (Q & ~Q)"], "~P"),
-    "categorical syllogism":    ("categorical", ["All M are P", "All S are M"], "All S are P"),
+    "modus ponens": [
+        ("propositional", ["P -> Q", "P"], "Q"),
+    ],
+    "modus tollens": [
+        ("propositional", ["P -> Q", "~Q"], "~P"),
+    ],
+    "affirming the consequent": [
+        ("propositional", ["P -> Q", "Q"], "P"),
+    ],
+    "denying the antecedent": [
+        ("propositional", ["P -> Q", "~P"], "~Q"),
+    ],
+    "hypothetical syllogism": [
+        ("propositional", ["P -> Q", "Q -> R"], "P -> R"),
+    ],
+    "disjunctive syllogism": [
+        ("propositional", ["P | Q", "~P"], "Q"),
+        ("propositional", ["P | Q", "~Q"], "P"),
+    ],
+    "reductio ad absurdum": [
+        ("propositional", ["P -> (Q & ~Q)"], "~P"),
+        ("propositional", ["P -> Q", "P -> ~Q"], "~P"),
+    ],
+    "categorical syllogism": [
+        ("categorical", ["All M are P", "All S are M"], "All S are P"),      # Barbara
+        ("categorical", ["No M are P", "All S are M"], "No S are P"),        # Celarent
+        ("categorical", ["All M are P", "Some S are M"], "Some S are P"),    # Darii
+        ("categorical", ["No M are P", "Some S are M"], "Some S are not P"), # Ferio
+    ],
 }
 
 # Variation knobs. Constructed data's failure mode is uniformity -- a model can
@@ -243,126 +271,138 @@ def call(cl, model, prompt, schema, temperature, retries=5):
     raise RuntimeError("unreachable")
 
 
+def build_one(cl, args, form, i, rng_seed):
+    """One item end to end. Pure I/O wait, so these run concurrently."""
+    rng = random.Random(rng_seed)
+    kind, prems, concl = rng.choice(SKELETONS[form])
+    labels = sorted({t for p in prems + [concl] for t in p.replace("(", " ")
+                     .replace(")", " ").replace("~", " ").replace("->", " ")
+                     .replace("|", " ").replace("&", " ").split()
+                     if t.isalnum() and t[0].isupper()})
+    spec = dict(kind=kind, premises=", ".join(prems), conclusion=concl,
+                kind_word="propositions" if kind == "propositional" else "terms",
+                domain=rng.choice(DOMAINS), register=rng.choice(REGISTERS),
+                order=rng.choice(ORDERS), labels=", ".join(labels))
+
+    # A render can come back as well-formed JSON whose `text` is empty -- the
+    # schema is satisfied, so `call`'s empty-body retry never fires. Retried here.
+    for attempt in range(3):
+        r = call(cl, args.render_model, RENDER_PROMPT.format(**spec), RENDER_SCHEMA, 1.0)
+        if (r.get("text") or "").strip():
+            break
+        time.sleep(2 * (attempt + 1))
+    else:
+        raise ValueError("renderer returned empty text three times")
+    # stage A: blind. Whether a frontier model reads it correctly with no help --
+    # difficulty, recorded per item, never a filter.
+    blind = call(cl, args.verify_model, VERIFY_PROMPT.format(text=r["text"]),
+                 VERIFY_SCHEMA, 0.0)
+    # stage B: conclusion supplied. The quality filter: does the PROSE express
+    # the skeleton?
+    v = call(cl, args.verify_model,
+             VERIFY_GIVEN_PROMPT.format(text=r["text"], conclusion=r["conclusion"]),
+             VERIFY_SCHEMA, 0.0)
+
+    derived, blind_derived = classify(v), classify(blind)
+    return {"id": f"formal_{form.replace(' ', '_')}_{i:03d}",
+            "text": r["text"], "origin": "constructed", "tier": 1,
+            "target_form": form,
+            "skeleton": {"kind": kind, "premises": prems, "conclusion": concl},
+            "render_mapping": r.get("mapping"),
+            "verifier": {"model": args.verify_model, "formalization": v,
+                         "derived_form": derived},
+            "unaided": {"formalization": blind, "derived_form": blind_derived,
+                        "correct": blind_derived == form},
+            "label": {"premises": r["premises"], "conclusion": r["conclusion"],
+                      "argument_type": "deductive", "form": [form],
+                      "suppressed_premise": None},
+            "certain": ["form", "argument_type"]}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--per-form", type=int, default=25)
     ap.add_argument("--seed", type=int, default=7)
-    ap.add_argument("--out", default="data/interim/formal_tier1.jsonl")
-    ap.add_argument("--rejects", default="data/interim/formal_tier1_rejects.jsonl")
+    ap.add_argument("--out", help="default: data/interim/formal_tier1_<stamp>.jsonl")
+    ap.add_argument("--rejects")
     ap.add_argument("--forms", nargs="*", help="subset of forms; default all")
     ap.add_argument("--render-model", default=RENDER_MODEL)
     ap.add_argument("--verify-model", default=VERIFY_MODEL)
-    ap.add_argument("--sleep", type=float, default=0.0,
-                    help="pause between items, to stay under a rate limit")
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--apply", action="store_true")
+    ap.add_argument("--dry-run", action="store_true", help="ignored; the default")
     args = ap.parse_args()
 
-    rng = random.Random(args.seed)
+    # Timestamped by default. A second run previously overwrote the first at a
+    # fixed path, and the comparison between them had to be reconstructed from
+    # console output that happened to still be on screen.
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    out_path = args.out or f"data/interim/formal_tier1_{stamp}.jsonl"
+    rej_path = args.rejects or f"data/interim/formal_tier1_{stamp}_rejects.jsonl"
+
     cl = genai.Client(vertexai=True, project=os.environ["GOOGLE_CLOUD_PROJECT"],
                       location=LOCATION)
     targets = args.forms or list(SKELETONS)
-    kept, rejected = [], []
-    stats = collections.Counter()
-    # Written as they are produced, not buffered to the end: a long run that dies
-    # on the last call should not cost every item before it.
-    out_fh = open(args.out, "w") if args.apply else None
-    rej_fh = open(args.rejects, "w") if args.apply else None
+    tasks = [(f, i) for f in targets for i in range(args.per_form)]
+    kept, rejected, errors = [], [], []
+    lock = threading.Lock()
+    out_fh = open(out_path, "w") if args.apply else None
+    rej_fh = open(rej_path, "w") if args.apply else None
 
-    for form in targets:
-        kind, prems, concl = SKELETONS[form]
-        labels = sorted({t for p in prems + [concl] for t in p.replace("(", " ")
-                         .replace(")", " ").replace("~", " ").replace("->", " ")
-                         .replace("|", " ").replace("&", " ").split()
-                         if t.isalnum() and t[0].isupper()})
-        for i in range(args.per_form):
-            spec = dict(kind=kind, premises=", ".join(prems), conclusion=concl,
-                        kind_word="propositions" if kind == "propositional" else "terms",
-                        domain=rng.choice(DOMAINS), register=rng.choice(REGISTERS),
-                        order=rng.choice(ORDERS), labels=", ".join(labels))
+    def work(task):
+        form, i = task
+        return form, i, build_one(cl, args, form, i, args.seed * 100003 + hash((form, i)) % 10**6)
+
+    done = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = {pool.submit(work, t): t for t in tasks}
+        for fut in concurrent.futures.as_completed(futures):
+            form, i = futures[fut]
+            done += 1
             try:
-                # temperature high on render for variety, 0 on verify for a
-                # reproducible check
-                r = call(cl, args.render_model, RENDER_PROMPT.format(**spec),
-                         RENDER_SCHEMA, 1.0)
-                # stage A: blind. Records whether a frontier model reads it
-                # correctly with no help -- difficulty, not quality.
-                blind = call(cl, args.verify_model, VERIFY_PROMPT.format(text=r["text"]),
-                             VERIFY_SCHEMA, 0.0)
-                # stage B: conclusion supplied. This is the quality filter: does
-                # the PROSE express the skeleton?
-                v = call(cl, args.verify_model,
-                         VERIFY_GIVEN_PROMPT.format(text=r["text"],
-                                                    conclusion=r["conclusion"]),
-                         VERIFY_SCHEMA, 0.0)
-                if args.sleep:
-                    time.sleep(args.sleep)
+                _, _, rec = fut.result()
             except Exception as e:
-                stats["api error"] += 1
-                print(f"  [{form}] api error: {type(e).__name__}: {str(e)[:120]}")
+                errors.append((form, i, f"{type(e).__name__}: {str(e)[:100]}"))
                 continue
+            with lock:
+                if rec["verifier"]["derived_form"] == form:
+                    kept.append(rec)
+                    fh = out_fh
+                else:
+                    rec["reject_reason"] = (
+                        f"round trip derived {rec['verifier']['derived_form']!r}, "
+                        f"built as {form!r}")
+                    rejected.append(rec)
+                    fh = rej_fh
+                if fh:
+                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                    fh.flush()
+            if done % 25 == 0:
+                print(f"  {done}/{len(tasks)}  kept {len(kept)}  "
+                      f"rejected {len(rejected)}  errors {len(errors)}", flush=True)
 
-            derived = classify(v)
-            blind_derived = classify(blind)
-            rec = {"id": f"formal_{form.replace(' ', '_')}_{i:03d}",
-                   "text": r["text"], "origin": "constructed", "tier": 1,
-                   "target_form": form,
-                   "skeleton": {"kind": kind, "premises": prems, "conclusion": concl},
-                   "render_mapping": r.get("mapping"),
-                   "verifier": {"model": args.verify_model, "formalization": v,
-                                "derived_form": derived},
-                   "unaided": {"formalization": blind, "derived_form": blind_derived,
-                               "correct": blind_derived == form},
-                   "label": {"premises": r["premises"], "conclusion": r["conclusion"],
-                             "argument_type": "deductive", "form": [form],
-                             "suppressed_premise": None},
-                   "certain": ["form", "argument_type"]}
-            if derived == form:
-                kept.append(rec)
-                stats[f"{form}: kept"] += 1
-                fh = out_fh
-            else:
-                rec["reject_reason"] = f"round trip derived {derived!r}, built as {form!r}"
-                rejected.append(rec)
-                stats[f"{form}: rejected"] += 1
-                fh = rej_fh
-            if fh:
-                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                fh.flush()
-        print(f"  {form:28} {stats[f'{form}: kept']:3} kept / "
-              f"{stats[f'{form}: kept'] + stats[f'{form}: rejected']:3}", flush=True)
-
-    print(f"\n{len(kept)} kept, {len(rejected)} rejected "
-          f"({len(kept) / max(len(kept) + len(rejected), 1):.0%} yield)")
+    total = len(kept) + len(rejected)
+    print(f"\n{len(kept)} kept, {len(rejected)} rejected, {len(errors)} errors "
+          f"({len(kept) / max(total, 1):.0%} yield)")
     print(f"{'form':28} {'kept':>5} {'rej':>4}   unaided-correct (difficulty)")
     for form in targets:
-        k, r = stats[f"{form}: kept"], stats[f"{form}: rejected"]
         sub = [x for x in kept if x["target_form"] == form]
+        rj = sum(1 for x in rejected if x["target_form"] == form)
         u = sum(1 for x in sub if x["unaided"]["correct"])
         pct = f"{u}/{len(sub)} = {u / len(sub):.0%}" if sub else "-"
-        print(f"  {form:28} {k:4} {r:4}   {pct}")
+        print(f"  {form:28} {len(sub):4} {rj:4}   {pct}")
     u = sum(1 for x in kept if x["unaided"]["correct"])
     print(f"\n  frontier model reading unaided: {u}/{len(kept)} = "
           f"{u / max(len(kept), 1):.0%} correct on the kept set")
-    if stats["api error"]:
-        print(f"  api errors: {stats['api error']}")
-
-    if kept:
-        print("\nsample:")
-        s = kept[0]
-        print(f"  [{s['target_form']}] {s['text'][:220]}")
-    if rejected:
-        print("\nrejected sample (what the verifier saw instead):")
-        s = rejected[0]
-        print(f"  built as {s['target_form']}, derived {s['verifier']['derived_form']!r}")
-        print(f"  {s['text'][:220]}")
-        print(f"  verifier: {s['verifier']['formalization'].get('premises')} "
-              f"|- {s['verifier']['formalization'].get('conclusion')}")
+    if errors:
+        print(f"\n  {len(errors)} errors, first few:")
+        for form, i, msg in errors[:4]:
+            print(f"    {form} #{i}: {msg}")
 
     if args.apply:
         out_fh.close()
         rej_fh.close()
-        print(f"\nwrote {args.out} ({len(kept)}) and {args.rejects} ({len(rejected)})")
+        print(f"\nwrote {out_path} ({len(kept)}) and {rej_path} ({len(rejected)})")
     else:
         print("\nDRY RUN — re-run with --apply to write")
 
