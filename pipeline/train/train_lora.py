@@ -1,9 +1,27 @@
-"""LoRA fine-tune Qwen2.5-1.5B-Instruct on the extraction task. Runs on Colab (T4).
+"""LoRA fine-tune Qwen2.5 on the extraction task. Runs on Colab (T4).
 
 Loss is computed on the assistant turn only — the model is graded on the JSON it
 produces, not on its ability to echo back the schema instruction and the passage.
 
     python train_lora.py --epochs 3 --out lora_out
+    python train_lora.py --epochs 1 --init-adapter lora_v6 --out lora_v6
+
+`--init-adapter` continues from an adapter trained in an EARLIER SESSION, which is
+what makes training survive a free Colab VM. Three consecutive runs died before
+finishing: one when a laptop lid closed and stopped the CLI keep-alive, one when
+Colab reclaimed the VM at ~60 minutes of sustained GPU load, and one to a
+keep-alive failure at 8 minutes that has no explanation. Each lost everything,
+because checkpoints were written with save_strategy="epoch" onto a VM that then
+disappeared, and nothing ever moved them off it.
+
+Training in one-epoch chunks, carrying the adapter out after each, turns any of
+those failures into the loss of a single epoch. The adapter is ~300 MB for a 3B,
+which moves in a couple of minutes; a full HF checkpoint carrying optimizer state
+would be several times that.
+
+What that costs: the optimizer state does NOT carry across chunks, so each chunk
+restarts Adam's moments and the LR schedule. For LoRA at this scale that is a mild
+cost and a known one -- and it is strictly better than losing the run.
 """
 
 # Unsloth MUST be imported before trl / transformers / peft, or its patches
@@ -28,19 +46,32 @@ ap.add_argument("--rank", type=int, default=16)
 ap.add_argument("--batch", type=int, default=2)
 ap.add_argument("--accum", type=int, default=4)
 ap.add_argument("--lr", type=float, default=2e-4)
+ap.add_argument("--init-adapter", help="continue from this adapter directory")
 args = ap.parse_args()
 
-model, tok = FastLanguageModel.from_pretrained(
-    model_name=args.base, max_seq_length=args.max_seq,
-    dtype=None,            # let Unsloth pick: fp16 on T4, bf16 on newer cards
-    load_in_4bit=True,
-)
-model = FastLanguageModel.get_peft_model(
-    model, r=args.rank, lora_alpha=args.rank * 2, lora_dropout=0.0, bias="none",
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
-                    "gate_proj", "up_proj", "down_proj"],
-    use_gradient_checkpointing="unsloth", random_state=20260902,
-)
+import os
+
+if args.init_adapter and os.path.isdir(args.init_adapter):
+    # Loading the adapter directly restores the trained weights; get_peft_model
+    # would discard them and start from a fresh zero-initialised LoRA.
+    print(f"resuming from adapter {args.init_adapter}", flush=True)
+    model, tok = FastLanguageModel.from_pretrained(
+        model_name=args.init_adapter, max_seq_length=args.max_seq,
+        dtype=None, load_in_4bit=True,
+    )
+    FastLanguageModel.for_training(model)
+else:
+    model, tok = FastLanguageModel.from_pretrained(
+        model_name=args.base, max_seq_length=args.max_seq,
+        dtype=None,        # let Unsloth pick: fp16 on T4, bf16 on newer cards
+        load_in_4bit=True,
+    )
+    model = FastLanguageModel.get_peft_model(
+        model, r=args.rank, lora_alpha=args.rank * 2, lora_dropout=0.0, bias="none",
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj",
+                        "gate_proj", "up_proj", "down_proj"],
+        use_gradient_checkpointing="unsloth", random_state=20260902,
+    )
 
 def to_text(batch):
     return {"text": [tok.apply_chat_template(c, tokenize=False)
