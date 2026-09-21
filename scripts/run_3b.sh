@@ -41,6 +41,7 @@ fi
 $C upload -s "$S" scripts/colab_steps/lfjob.py /content/lfjob.py
 
 run_job () {  # run_job <launch-script> <label>
+  local FAILS=0
   echo "==> $2"
   cell "$1" | tail -3
   while true; do
@@ -48,8 +49,19 @@ run_job () {  # run_job <launch-script> <label>
     # session record last time, orphaning a VM we could no longer address.
     out=$(cell scripts/colab_steps/poll.py || true)
     if [ -z "$out" ] || grep -q "not found\|Traceback (most recent call last):.*colab" <<<"$out"; then
-      echo "    ...transient poll failure, retrying  [$(date +%H:%M:%S)]"; sleep 60; continue
+      FAILS=$((FAILS + 1))
+      # A blip and a dead session look identical here, so tolerating failures
+      # forever means a reclaimed VM is polled until someone notices. One run
+      # spent 11 hours and 39 retries on a session that had been gone since
+      # minute 17. Ten consecutive failures is well past any real blip.
+      if [ "$FAILS" -ge 10 ]; then
+        echo "    session gone after $FAILS consecutive poll failures -- giving up" >&2
+        $C status -s "$S" 2>&1 | head -2 >&2
+        echo "FAILED at: $2 (session lost)" >&2; return 1
+      fi
+      echo "    ...poll failure $FAILS/10, retrying  [$(date +%H:%M:%S)]"; sleep 60; continue
     fi
+    FAILS=0
     if grep -q "JOB OK" <<<"$out"; then echo "    done: $2"; return 0; fi
     if grep -q "JOB FAILED\|DEAD" <<<"$out"; then
       echo "$out"; echo "FAILED at: $2" >&2; return 1

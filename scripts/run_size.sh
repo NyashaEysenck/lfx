@@ -8,9 +8,25 @@
 #   scripts/run_size.sh 1_5b unsloth/Qwen2.5-1.5B-Instruct
 #   scripts/run_size.sh 3b   unsloth/Qwen2.5-3B-Instruct
 #
-# RESUMABLE, exactly as run_3b.sh: every long step runs detached on the VM (see
-# colab_steps/lfjob.py) and this script only polls. Killing it, closing the laptop
-# or losing the network costs nothing -- re-run and it reattaches.
+# RESUMABLE: every long step runs detached on the VM (see colab_steps/lfjob.py)
+# and this script only polls, so killing the script or losing the network costs
+# nothing -- re-run and it reattaches.
+#
+# **THE LAPTOP MUST STAY AWAKE.** This said "closing the laptop costs nothing" and
+# that was wrong. The JOB is detached from the shell; the SESSION is not detached
+# from the machine, because the Colab CLI holds it open with a local keep-alive.
+# A v6 run died this way: lid closed at 22:16, keep_alive_error at 22:19, session
+# gone at step 108 of 868. `colab log -s <session>` shows the sequence.
+#
+# So run it with the lid open, and prevent idle sleep:
+#
+#     caffeinate -is scripts/run_size.sh v6 unsloth/Qwen2.5-3B-Instruct 4
+#
+# caffeinate stops IDLE sleep but not clamshell sleep -- on battery, closing the
+# lid sleeps regardless. Sessions on this account have run 20-29 hours when the
+# machine stayed awake, so there is no short Colab limit to design around; the
+# "~55 minute free T4 life" recorded earlier in this project is not a Colab limit
+# and should not be treated as one.
 set -euo pipefail
 
 TAG="${1:?usage: run_size.sh <tag> <base-model> [epochs]}"
@@ -81,6 +97,7 @@ fi
 $C upload -s "$S" scripts/colab_steps/lfjob.py /content/lfjob.py
 
 run_job () {  # run_job <local-cell> <label>
+  local FAILS=0
   echo "==> $2"
   cell "$1" | tail -3
   while true; do
@@ -88,8 +105,19 @@ run_job () {  # run_job <local-cell> <label>
     # session record once, orphaning a VM we could no longer address.
     out=$(cell scripts/colab_steps/poll.py || true)
     if [ -z "$out" ] || grep -q "not found\|Traceback (most recent call last):.*colab" <<<"$out"; then
-      echo "    ...transient poll failure, retrying  [$(date +%H:%M:%S)]"; sleep 60; continue
+      FAILS=$((FAILS + 1))
+      # A blip and a dead session look identical here, so tolerating failures
+      # forever means a reclaimed VM is polled until someone notices. One run
+      # spent 11 hours and 39 retries on a session that had been gone since
+      # minute 17. Ten consecutive failures is well past any real blip.
+      if [ "$FAILS" -ge 10 ]; then
+        echo "    session gone after $FAILS consecutive poll failures -- giving up" >&2
+        $C status -s "$S" 2>&1 | head -2 >&2
+        echo "FAILED at: $2 (session lost)" >&2; return 1
+      fi
+      echo "    ...poll failure $FAILS/10, retrying  [$(date +%H:%M:%S)]"; sleep 60; continue
     fi
+    FAILS=0
     if grep -q "JOB OK" <<<"$out"; then echo "    done: $2"; return 0; fi
     if grep -q "JOB FAILED\|DEAD" <<<"$out"; then
       echo "$out"; echo "FAILED at: $2" >&2; return 1
