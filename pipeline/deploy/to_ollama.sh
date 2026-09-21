@@ -28,7 +28,7 @@ ADAPTER="${2:?}"; BASE="${3:?}"; PROMPT="${4:?}"; QUANT="${5:-q4_K_M}"
 
 MERGED="models/merged_${NAME}"
 WORK="${TMPDIR:-/tmp}/lfx_gguf_${NAME}"; mkdir -p "$WORK"
-GGUF="$WORK/${NAME}-f16.gguf"
+GGUF="$WORK/${NAME}-q.gguf"
 LLAMA="${LLAMA_CPP:-$WORK/llama.cpp}"
 
 # Ollama.app ships its own CLI; a Homebrew `ollama` can be many versions behind
@@ -48,15 +48,28 @@ if [ ! -d "$MERGED" ]; then
   python3 pipeline/train/merge_adapter.py --base "$BASE" --adapter "$ADAPTER" --out "$MERGED"
 fi
 
-echo "==> converting to GGUF (llama.cpp, NOT ollama's importer)"
-python3 "$LLAMA/convert_hf_to_gguf.py" "$MERGED" --outfile "$GGUF" --outtype f16
+# Ollama no longer quantises at create time from a GGUF -- "create-time
+# quantization is only supported for safetensors imports" -- though it did two
+# weeks ago, so the server changed under us. Quantising during conversion instead.
+# convert_hf_to_gguf.py offers f32/f16/bf16/q8_0 and no K-quants, so q4_K_M needs
+# llama-quantize, a C++ binary this sparse checkout does not build. q8_0 is the
+# best available without that, and costs size on a CPU workload that is bound by
+# memory bandwidth.
+case "$QUANT" in
+  f32|f16|bf16|q8_0) OUTTYPE="$QUANT" ;;
+  *) echo "    note: $QUANT needs llama-quantize (not built here); using q8_0"
+     OUTTYPE="q8_0" ;;
+esac
+
+echo "==> converting to GGUF at $OUTTYPE (llama.cpp, NOT ollama's importer)"
+python3 "$LLAMA/convert_hf_to_gguf.py" "$MERGED" --outfile "$GGUF" --outtype "$OUTTYPE"
 
 echo "==> writing Modelfile"
 python3 pipeline/deploy/make_modelfile.py --model "$GGUF" --prompt "$PROMPT" \
     --base "$BASE" --adapter "$ADAPTER" --out "Modelfile.$NAME"
 
-echo "==> ollama create $NAME ($QUANT)"
-$OLLAMA create "$NAME" -f "Modelfile.$NAME" --quantize "$QUANT"
+echo "==> ollama create $NAME (already $OUTTYPE; no create-time quantisation)"
+$OLLAMA create "$NAME" -f "Modelfile.$NAME"
 
 echo
 echo "built $NAME. Verify it before trusting it:"
