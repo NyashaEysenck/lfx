@@ -180,10 +180,36 @@ def main():
         print(row)
 
     _, _, per_form, confusion = results[-1]
-    print(f"\nper-form accuracy ({names[-1]}):")
-    for form, (ok_, tot) in sorted(per_form.items(), key=lambda kv: kv[1][0] / max(kv[1][1], 1)):
-        if tot:
-            print(f"  {form:<26} {ok_:>3}/{tot:<3} {'#' * round(ok_ / tot * 20)}")
+    # Recall alone was reported here until v6, and it hid a real failure: v6
+    # predicted `straw man` 152 times against 54 true instances, so its straw man
+    # RECALL rose 0.759 -> 0.889 while its precision fell ~0.53 -> ~0.32. A class
+    # used as a dumping ground looks like an improvement to a recall-only table.
+    # Precision needs the predicted count, which is the correct predictions plus
+    # every mistake that landed on this class.
+    predicted = collections.Counter()
+    for (g, pr), c in confusion.items():
+        predicted[pr] += c
+    print(f"\nper-form precision / recall / F1 ({names[-1]}), worst F1 first:")
+    print(f"  {'form':<34} {'P':>6} {'R':>6} {'F1':>6}   {'right/gold':>10} {'predicted':>9}")
+    rows, f1s = [], []
+    for form, (ok_, tot) in per_form.items():
+        if not tot:
+            continue
+        n_pred = ok_ + predicted.get(form, 0)
+        prec = ok_ / n_pred if n_pred else 0.0
+        rec = ok_ / tot
+        f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
+        f1s.append(f1)
+        # over-prediction is the failure recall cannot see, so it is flagged
+        flag = "  <- over-predicted" if n_pred > 1.5 * tot and prec < 0.6 else ""
+        rows.append((f1, form, prec, rec, ok_, tot, n_pred, flag))
+    for f1, form, prec, rec, ok_, tot, n_pred, flag in sorted(rows):
+        print(f"  {form:<34} {prec:6.3f} {rec:6.3f} {f1:6.3f}   {ok_:>4}/{tot:<5} {n_pred:>9}{flag}")
+    if f1s:
+        # Macro-F1 weights every class equally, so a large class cannot carry the
+        # average -- the property the old headline lacked when 200 of 485 records
+        # were ad hominem.
+        print(f"\n  MACRO-F1 over {len(f1s)} classes: {sum(f1s) / len(f1s):.3f}")
     if confusion:
         print(f"\ntop confusions ({names[-1]}, gold -> predicted):")
         for (g, p), c in confusion.most_common(10):
