@@ -43,9 +43,11 @@ if [ ! -d "$LLAMA" ]; then
   git -C "$LLAMA" sparse-checkout set --skip-checks gguf-py conversion
 fi
 
+PY="${PYTHON:-.venv/bin/python}"
+
 if [ ! -d "$MERGED" ]; then
   echo "==> merging $ADAPTER into $BASE"
-  python3 pipeline/train/merge_adapter.py --base "$BASE" --adapter "$ADAPTER" --out "$MERGED"
+  $PY pipeline/train/merge_adapter.py --base "$BASE" --adapter "$ADAPTER" --out "$MERGED"
 fi
 
 # Ollama no longer quantises at create time from a GGUF -- "create-time
@@ -62,10 +64,10 @@ case "$QUANT" in
 esac
 
 echo "==> converting to GGUF at $OUTTYPE (llama.cpp, NOT ollama's importer)"
-python3 "$LLAMA/convert_hf_to_gguf.py" "$MERGED" --outfile "$GGUF" --outtype "$OUTTYPE"
+$PY "$LLAMA/convert_hf_to_gguf.py" "$MERGED" --outfile "$GGUF" --outtype "$OUTTYPE"
 
 echo "==> writing Modelfile"
-python3 pipeline/deploy/make_modelfile.py --model "$GGUF" --prompt "$PROMPT" \
+$PY pipeline/deploy/make_modelfile.py --model "$GGUF" --prompt "$PROMPT" \
     --base "$BASE" --adapter "$ADAPTER" --out "Modelfile.$NAME"
 
 echo "==> ollama create $NAME (already $OUTTYPE; no create-time quantisation)"

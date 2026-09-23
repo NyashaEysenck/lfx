@@ -197,6 +197,7 @@ def label_one(cl, examples, text, retries=3):
         response_mime_type="application/json",
         response_schema=RESPONSE_SCHEMA,
         temperature=0.0,
+        http_options=types.HttpOptions(timeout=45000),
     )
     for attempt in range(retries):
         try:

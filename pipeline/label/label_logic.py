@@ -54,25 +54,29 @@ n = [0]
 def one(r):
     try:
         lab = label_one(cl, examples, r["text"])
+        gemini_form = lab["form"]
+        lab["form"] = [r["gold_form"]] if isinstance(r["gold_form"], str) else list(r["gold_form"])
+        category = r.get("category", f"logic_{r.get('gold_form', 'unknown').replace(' ', '_')}")
+        source = r.get("source", f"LOGIC (Jin et al. 2022), human label: {r.get('gold_form', '')}")
+        rec = {
+            "id": r["id"],
+            "category": category,
+            "source": source,
+            "text": r["text"],
+            "label": lab,
+            "gemini_form": gemini_form,
+            "form_source": "human (LOGIC)",
+            "reviewed": False,
+            "review_notes": "",
+        }
+        with lock:
+            out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            out.flush()
+            n[0] += 1
+            print(f"  [{n[0]}/{len(todo)}] {r['id']} -> {lab['form']} (gemini: {gemini_form})", flush=True)
     except Exception as exc:  # noqa: BLE001
-        print(f"  ! {r['id']}: {type(exc).__name__}"[:120], file=sys.stderr)
+        print(f"  ! {r['id']}: {type(exc).__name__}: {exc}"[:120], file=sys.stderr)
         return
-    gemini_form = lab["form"]
-    lab["form"] = r["gold_form"]                 # human label wins
-    rec = {k: r[k] for k in ("id", "category", "source", "text")}
-    rec.update({
-        "label": lab,
-        "gemini_form": gemini_form,
-        "form_source": "human (LOGIC)",
-        "reviewed": False,
-        "review_notes": "",
-    })
-    with lock:
-        out.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        out.flush()
-        n[0] += 1
-        if n[0] % 50 == 0:
-            print(f"  {n[0]}/{len(todo)}", flush=True)
 
 
 with ThreadPoolExecutor(max_workers=args.workers) as pool:
