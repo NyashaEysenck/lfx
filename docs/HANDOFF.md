@@ -153,7 +153,7 @@ These are the contribution. Each is in a commit message with the numbers.
 
 ## Current state
 
-**Registry (`nyasha_stino/lfx`):** `v7-q8` is published and tested; `latest` and `3b-q8` still point to v5 (ready to be updated to v7).
+**Registry (`nyasha_stino/lfx`):** `latest`, `3b-q8`, and `v7-q8` all point to v7. `v6-q8` = v6.
 
 **On disk:** `models/lora_3b` (v5 adapter), `models/lora_v6` (v6 adapter), `models/lora_v7` (v7 adapter), `models/merged_v7` (6.18 GB, regenerable — safe to delete), `results/preds_v7_bench_full.jsonl`.
 
@@ -163,18 +163,13 @@ These are the contribution. Each is in a commit message with the numbers.
 - 6-epoch chunked training completed via `scripts/run_chunked.sh` on Colab T4.
 - Model packaged to GGUF q8_0 via `pipeline/deploy/to_ollama.sh` and pushed to `nyasha_stino/lfx:v7-q8`.
 - Full 1521-item benchmark evaluated on Vertex AI CPU and scored with `pipeline/eval/evaluate.py`.
+- Promoted v7 to `latest` and `3b-q8` on Ollama registry.
 
 ---
 
 ## Next steps, in order
 
-1. **Promote v7 to `latest` and `3b-q8` on Ollama:**
-   ```bash
-   ollama cp v7 nyasha_stino/lfx:latest && ollama push nyasha_stino/lfx:latest
-   ollama cp v7 nyasha_stino/lfx:3b-q8 && ollama push nyasha_stino/lfx:3b-q8
-   ```
-
-2. **Clean up disk space:**
+1. **Clean up disk space:**
    `models/merged_v6` and `models/merged_v7` are ~12 GB total and fully regenerable from adapters; delete them if disk space is needed.
 
 ### Later
