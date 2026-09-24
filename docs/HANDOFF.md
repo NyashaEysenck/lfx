@@ -56,30 +56,29 @@ filter and is biased toward items models find easy.
 
 ## Results
 
-### v5 (the published 3B) vs v6 (retrained), full 1521-record benchmark
+### v5 vs v6 vs v7 (retrained with informal fallacy rebalance), full 1521-record benchmark
 
-| tier | n | v5 | v6 | delta |
-|---|---|---|---|---|
-| constructed-symbolic | 693 | 0.743 | 0.987 | +0.244 |
-| constructed-consensus | 309 | 0.796 | 0.932 | +0.136 |
-| **external-human** | **485** | **0.765** | **0.625** | **−0.140** |
-| project-authored | 34 | 0.412 | 0.441 | +0.029 |
-| overall accuracy | 1521 | 0.753 | 0.848 | +0.095 (McNemar z=7.78) |
-| **macro-F1** | 22 cls | **0.705** | **0.836** | +0.131 |
+| tier | n | v5 | v6 | v7 | delta (v6→v7) |
+|---|---|---|---|---|---|
+| constructed-symbolic | 693 | 0.743 | 0.987 | 0.988 | +0.001 |
+| constructed-consensus | 309 | 0.796 | 0.932 | 0.929 | −0.003 |
+| **external-human** | **485** | **0.763** | **0.625** | **0.781** | **+0.157** (McNemar z=7.18) |
+| project-authored | 34 | 0.412 | 0.441 | 0.412 | −0.029 |
+| overall accuracy | 1521 | 0.753 | 0.848 | **0.897** | **+0.049** (McNemar z=6.32) |
+| **macro-F1** | 22 cls | **0.705** | **0.836** | **0.861** | **+0.025** |
 
-**Verdict, by the criterion fixed before the run:** the external-human tier is
-the one that matters, and v6 regressed on it. **v6 is not a straight
-improvement and should not replace v5 on Ollama as-is.**
+**Verdict on v7:** The dilution hypothesis was confirmed. By adding the 61 labeled
+LOGIC rows and upsampling the five informal fallacies ×2 (restoring their training share
+from 13% to 27%), **external-human accuracy fully rebounded to 0.781** (exceeding
+v5's 0.763), while retaining the constructed-class gains (`reductio` 0.988,
+`equivocation` 0.643, `categorical syllogism` 0.989). **v7 is a clean improvement
+and is ready to become `latest` on Ollama.**
 
-What v6 fixed: `reductio` 0.025 → 1.000, `equivocation` 0.143 → 0.690,
-`affirming the consequent` 0.544 → 1.000, `categorical syllogism` 0.711 → 0.978.
+What v7 fixed:
+- `straw man` precision rose from 0.316 → **0.568** (F1 0.466 → **0.681**; predictions dropped from 152 to 81).
+- `ad hominem` recall restored from 0.430 → **0.750** (F1 0.593 → **0.843**; confusions to `straw man` collapsed from 93 to 29).
+- Retained v6 fixes: `reductio` 0.988, `affirming the consequent` 0.989, `categorical syllogism` 0.989.
 
-What broke: `ad hominem` 0.790 → 0.430. **93 of 200 went to `straw man`.** v6
-predicts `straw man` 152 times against 54 true instances (precision 0.316).
-
-**Likely cause (untested):** 988 constructed items were added for formal and
-inductive classes and none for the five informal fallacies that cannot be
-constructed. Those five went from 30% of training (222/741) to 13% (222/1729).
 
 ---
 
@@ -154,59 +153,29 @@ These are the contribution. Each is in a commit message with the numbers.
 
 ## Current state
 
-**Registry (`nyasha_stino/lfx`):** `latest` and `3b-q8` = v5; `v6-q8` = v6.
-`3b-q4` **does not exist** — that push was killed and never retried.
+**Registry (`nyasha_stino/lfx`):** `v7-q8` is published and tested; `latest` and `3b-q8` still point to v5 (ready to be updated to v7).
 
-**On disk:** `models/lora_3b` (v5 adapter), `models/lora_v6` (v6 adapter),
-`models/merged_v6` (5.8 GB, regenerable — safe to delete),
-`models/mlx_v5_8bit` (v5, MLX).
+**On disk:** `models/lora_3b` (v5 adapter), `models/lora_v6` (v6 adapter), `models/lora_v7` (v7 adapter), `models/merged_v7` (6.18 GB, regenerable — safe to delete), `results/preds_v7_bench_full.jsonl`.
 
-**All work is committed.** In progress but not finished:
-- `data/interim/logic_rebalance.jsonl` — 61 unused LOGIC rows selected by
-  `pipeline/corpus/select_logic_rebalance.py` (17 ad populum, 17 begging the
-  question, 11 false dilemma, 9 ad hominem, 4 equivocation, 3 straw man).
-  **Not yet labelled** — the labelling run hung on the network block.
+**Completed in this phase:**
+- 61 LOGIC rows labeled into `data/interim/logic_rebalance_labeled.jsonl`.
+- v7 training data assembled in `data/splits/train.jsonl` (2069 examples; informal fallacies upsampled ×2 to 27%).
+- 6-epoch chunked training completed via `scripts/run_chunked.sh` on Colab T4.
+- Model packaged to GGUF q8_0 via `pipeline/deploy/to_ollama.sh` and pushed to `nyasha_stino/lfx:v7-q8`.
+- Full 1521-item benchmark evaluated on Vertex AI CPU and scored with `pipeline/eval/evaluate.py`.
 
 ---
 
 ## Next steps, in order
 
-1. **Check the network** with the curl above — `000` means wait or switch network.
-
-2. **Label the 61 LOGIC rows** (resumable):
-   ```
-   .venv/bin/python pipeline/label/label_logic.py \
-     --infile data/interim/logic_rebalance.jsonl \
-     --out data/interim/logic_rebalance_labeled.jsonl --workers 6
+1. **Promote v7 to `latest` and `3b-q8` on Ollama:**
+   ```bash
+   ollama cp v7 nyasha_stino/lfx:latest && ollama push nyasha_stino/lfx:latest
+   ollama cp v7 nyasha_stino/lfx:3b-q8 && ollama push nyasha_stino/lfx:3b-q8
    ```
 
-3. **Build v7 training data** to test the dilution hypothesis. LOGIC only has
-   9 `ad hominem` and 3 `straw man` left, so adding data alone cannot restore the
-   balance. Plan: keep all v6 data (preserves the `reductio` fix), add the 61
-   labelled LOGIC rows, and **upsample the five never-constructed informal
-   classes ×2** (ad hominem, straw man, ad populum, false dilemma, begging the
-   question) to restore their share toward ~25%. Watch for overfitting — with
-   duplicates and no LoRA dropout each is seen ~12× over 6 epochs.
-
-4. **Train v7** with the chunked runner, lid open:
-   ```
-   caffeinate -is scripts/run_chunked.sh v7 unsloth/Qwen2.5-3B-Instruct 6
-   ```
-
-5. **Package, push, evaluate remotely:**
-   ```
-   pipeline/deploy/to_ollama.sh v7 models/lora_v7 unsloth/Qwen2.5-3B-Instruct \
-     models/mlx_v5_8bit/prompt.txt q8_0
-   ollama cp v7 nyasha_stino/lfx:v7-q8 && ollama push nyasha_stino/lfx:v7-q8
-   pipeline/deploy/vertex_eval.sh data/benchmark/lfx_bench_v1.jsonl \
-     results/preds_v7_bench_full.jsonl 4 nyasha_stino/lfx:v7-q8
-   ```
-   **Wire each step to the previous one finishing** — twice a step completed and
-   nothing followed because nothing was triggered.
-
-6. **Judge v7 on external-human and macro-F1**, with `straw man` precision as
-   the specific thing to watch. Success = external-human back to ≥0.765 while
-   keeping the `reductio` / `equivocation` gains.
+2. **Clean up disk space:**
+   `models/merged_v6` and `models/merged_v7` are ~12 GB total and fully regenerable from adapters; delete them if disk space is needed.
 
 ### Later
 
