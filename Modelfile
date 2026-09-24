@@ -1,4 +1,4 @@
-FROM /var/folders/tr/707fwh8d0ms4wn_lgt7z7fpm0000gn/T/lfx_gguf_v7/v7-q.gguf
+FROM ./lfx-3b-q8.gguf
 
 TEMPLATE """{{ if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
@@ -30,7 +30,7 @@ Copyright (c) Alibaba Cloud. All Rights Reserved.
 NON-COMMERCIAL USE ONLY. The Qwen Research License permits use, reproduction,
 distribution and derivative works FOR NON-COMMERCIAL PURPOSES ONLY, defined as
 research or evaluation. Full terms:
-https://huggingface.co/unsloth/Qwen2.5-3B-Instruct/blob/main/LICENSE
+https://huggingface.co/Qwen/Qwen2.5-3B-Instruct/blob/main/LICENSE
 
 Training data: the LOGIC dataset (Jin et al., Findings of EMNLP 2022), MIT
 licensed, plus prose generated for this project.

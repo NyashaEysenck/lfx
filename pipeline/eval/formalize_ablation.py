@@ -42,10 +42,11 @@ import random
 import sys
 import time
 
-os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "agentic-school-506719")
-
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+load_dotenv()
 
 from lfx.formal import classify
 from lfx.schema import FORMS

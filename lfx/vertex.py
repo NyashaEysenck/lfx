@@ -13,9 +13,12 @@ import os
 import sys
 import time
 
+from dotenv import load_dotenv
 from google.genai import types
 
-PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "agentic-school-506719")
+load_dotenv()
+
+PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT")
 LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
 MODEL = "gemini-2.5-flash"
 
@@ -150,6 +153,10 @@ Field rules:
 
 def client():
     from google import genai
+    if not PROJECT:
+        raise RuntimeError(
+            "GOOGLE_CLOUD_PROJECT must be set. Set it in .env or export it in your environment."
+        )
     return genai.Client(vertexai=True, project=PROJECT, location=LOCATION)
 
 

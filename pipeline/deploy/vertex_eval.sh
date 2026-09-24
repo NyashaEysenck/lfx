@@ -29,7 +29,7 @@ SHARDS="${3:-4}"
 MODEL="${4:-nyasha_stino/lfx:3b-q8}"
 MACHINE="${5:-n2-standard-16}"
 
-P="${GOOGLE_CLOUD_PROJECT:-agentic-school-506719}"
+P="${GOOGLE_CLOUD_PROJECT:?Error: GOOGLE_CLOUD_PROJECT must be set. Export it or configure in .env}"
 R="${GOOGLE_CLOUD_LOCATION:-us-central1}"
 B="gs://lfx-$P"
 STAMP=$(date +%Y%m%d_%H%M%S)

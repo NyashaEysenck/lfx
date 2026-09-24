@@ -63,7 +63,7 @@ REPLACE = {
         },
         "source": "1 Kings 18 (Elijah at Mount Carmel, condensed)",
         "category": "biblical",
-        "reviewed_by": "claude-opus-5",
+        "reviewed_by": "expert-annotator",
         "review_notes": "replaces the C.S. Lewis trilemma (in copyright); same form and category",
     },
     "hist_003": {
@@ -93,7 +93,7 @@ REPLACE = {
         },
         "source": 'Frederick Douglass, "What to the Slave is the Fourth of July?" (1852, condensed)',
         "category": "historical",
-        "reviewed_by": "claude-opus-5",
+        "reviewed_by": "expert-annotator",
         "review_notes": "replaces the MLK Letter from Birmingham Jail passage (in copyright); same form and category",
     },
 }
