@@ -9,7 +9,7 @@ set -euo pipefail
 
 GOLD_URI="$1"     # gs://.../bench.jsonl
 OUT_URI="$2"      # gs://.../preds.jsonl
-MODEL="${3:-nyasha_stino/lfx:3b-q8}"   # :3b-q4 was never published -- that push was killed mid-upload
+MODEL="${3:-nyashastino/lfx:3b-q8}"   # :3b-q4 was never published -- that push was killed mid-upload
 SHARD="${4:-0}"   # this shard index
 SHARDS="${5:-1}"  # total shards
 

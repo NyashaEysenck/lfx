@@ -1,8 +1,8 @@
-# nyasha_stino/lfx — Logical Form Extractor
+# nyashastino/lfx — Logical Form Extractor
 
 **Extract the logical skeleton of natural-language arguments into structured JSON.**
 
-`nyasha_stino/lfx` is a fine-tuned 3B parameter model (based on `Qwen2.5-3B-Instruct`) engineered specifically to deconstruct natural-language arguments. Given an argumentative passage, it extracts individual premises, isolates the asserted conclusion, determines whether the argument is deductive or inductive, identifies the specific logical form or fallacy (from a 22-class taxonomy), and reconstructs unstated enthymematic premises.
+`nyashastino/lfx` is a fine-tuned 3B parameter model (based on `Qwen2.5-3B-Instruct`) engineered specifically to deconstruct natural-language arguments. Given an argumentative passage, it extracts individual premises, isolates the asserted conclusion, determines whether the argument is deductive or inductive, identifies the specific logical form or fallacy (from a 22-class taxonomy), and reconstructs unstated enthymematic premises.
 
 ---
 
@@ -11,7 +11,7 @@
 Run directly in your terminal:
 
 ```bash
-ollama run nyasha_stino/lfx "All men are mortal. Socrates is a man. Therefore Socrates is mortal."
+ollama run nyashastino/lfx "All men are mortal. Socrates is a man. Therefore Socrates is mortal."
 ```
 
 Output:
@@ -36,13 +36,12 @@ Output:
 
 | Tag | Quantization | Size | RAM Required | Best For |
 |---|---|---|---|---|
-| `nyasha_stino/lfx:latest`<br>`nyasha_stino/lfx:3b-q8` | `Q8_0` (8-bit) | 3.3 GB | ~4.5 GB | **Recommended.** Best overall accuracy (76.5% form accuracy) and highest premise extraction fidelity. |
-| `nyasha_stino/lfx:3b-q4` | `Q4_K_M` (4-bit) | 1.9 GB | ~2.8 GB | Low-memory environments, edge devices, and maximum generation speed (~95 tok/s). |
+| `nyashastino/lfx:latest`<br>`nyashastino/lfx:3b-q8` | `Q8_0` (8-bit) | 3.3 GB | ~4.5 GB | **Primary Release.** Best overall accuracy (89.7% benchmark accuracy, 78.1% on held-out human prose) and highest premise extraction fidelity. |
 
-To pull a specific quantization:
+To pull the model:
 ```bash
-ollama pull nyasha_stino/lfx:3b-q8
-ollama pull nyasha_stino/lfx:3b-q4
+ollama pull nyashastino/lfx
+ollama pull nyashastino/lfx:3b-q8
 ```
 
 ---
@@ -198,7 +197,7 @@ prompt = (
 )
 
 res = client.chat(
-    model="nyasha_stino/lfx",
+    model="nyashastino/lfx",
     messages=[{"role": "user", "content": prompt}],
     options={"temperature": 0.0},
 )
@@ -211,7 +210,7 @@ print(json.dumps(result, indent=2))
 
 ```bash
 curl http://localhost:11434/api/chat -d '{
-  "model": "nyasha_stino/lfx",
+  "model": "nyashastino/lfx",
   "messages": [
     {"role": "user", "content": "Nobody has proven that ghosts don'\''t exist, so they must be real."}
   ],
@@ -225,7 +224,7 @@ curl http://localhost:11434/api/chat -d '{
 import ollama from 'ollama';
 
 const response = await ollama.chat({
-  model: 'nyasha_stino/lfx',
+  model: 'nyashastino/lfx',
   messages: [{
     role: 'user',
     content: 'Smartphones cause attention deficits because constantly switching apps fragments concentration.'
@@ -240,22 +239,36 @@ console.log(analysis);
 
 ## Benchmark Performance
 
-Evaluated against unseen, held-out evaluation benchmarks:
+Evaluated on the unified **LFX-Bench v1** (1,521 unseen argumentative passages across all 22 classes with verified provenance):
 
-| Benchmark Split | Size | Schema Valid | Form Accuracy (e2e) | Argument Type Acc | Premise F1 |
-|---|---|---|---|---|---|
-| **Human-Annotated Held-Out (`extra_test_human`)** | 485 | **99.4%** | **76.5%** | **83.8%** | 0.715 |
-| **Synthetic Stratified Split (`test_gen`)** | 160 | **100%** | **81.2%** | **95.6%** | 0.875 |
-| **Philosophical Classics (`test_real`)** | 34 | **100%** | 41.2%* | **91.2%** | 0.795 |
+| Benchmark Metric | Full Benchmark (n=1521) | Held-Out Human Prose (n=485) |
+|---|---|---|
+| **End-to-End Form Accuracy** | **89.7%** (1365 / 1521) | **78.1%** (379 / 485) |
+| **Macro-F1 (22 Classes)** | **0.861** | **0.840** |
+| **Schema Validity** | **99.8%** | **99.8%** |
+| **JSON Parses** | **99.9%** | **100%** |
+| **Argument Type Accuracy** | **94.4%** | **84.5%** |
+| **Premise F1** | **0.890** | **0.748** |
+| **Conclusion Similarity** | **0.911** | **0.925** |
+| **Suppressed Premise Match** | **0.900** | **0.812** |
 
-*\*On `test_real`, 12 of the 34 passages are multi-step arguments classified as `other`. On single-form arguments in this split, form accuracy is 63.6%, and conclusion similarity is 94.8%.*
+### Breakdown by Provenance Tier:
+- **`constructed-symbolic` (n=693):** **98.8%** (label specified by construction, verified by blind formalization through symbolic rules)
+- **`constructed-consensus` (n=309):** **92.9%** (inductive forms verified by blind multi-model agreement)
+- **`external-human` (n=485):** **78.1%** (authentic human op-eds and speech passages from LOGIC)
+- **`project-authored` (n=34):** **41.2%** (condensed classical philosophical texts; 12 of 34 are multi-step `other`)
 
-### Accuracy on Major Informal Fallacies:
-- **False dilemma:** 82.7%
-- **Ad hominem:** 78.9%
-- **Ad populum:** 77.9%
-- **Straw man:** 75.9%
-- **Begging the question:** 64.5%
+### Per-Class Performance on Key Forms:
+- **`hypothetical syllogism`:** 1.000 F1 (100% recall, 100% precision)
+- **`affirming the consequent`:** 0.989 F1 (98.9% recall, 98.9% precision)
+- **`reductio ad absurdum`:** 0.975 F1 (98.8% recall, 96.3% precision)
+- **`categorical syllogism`:** 0.922 F1 (98.9% recall, 86.4% precision)
+- **`ad hominem`:** 0.843 F1 (75.0% recall, 96.2% precision)
+- **`ad populum`:** 0.831 F1 (82.7% recall, 83.5% precision)
+- **`false dilemma`:** 0.800 F1 (83.0% recall, 77.2% precision)
+- **`begging the question`:** 0.788 F1 (71.1% recall, 88.5% precision)
+- **`straw man`:** 0.681 F1 (85.2% recall, 56.8% precision)
+- **`equivocation`:** 0.643 F1 (64.3% recall, 64.3% precision)
 
 ---
 

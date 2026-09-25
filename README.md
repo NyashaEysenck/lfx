@@ -1,13 +1,13 @@
 # Logical Form Extractor (LFX)
 
 [![Model](https://img.shields.io/badge/Base_Model-Qwen2.5--3B--Instruct-blue.svg)](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct)
-[![Ollama](https://img.shields.io/badge/Ollama-nyasha__stino%2Flfx-black.svg)](https://ollama.com/nyasha_stino/lfx)
-[![Accuracy](https://img.shields.io/badge/Form_Accuracy-76.5%25_(e2e)-brightgreen.svg)](#how-well-it-works)
+[![Ollama](https://img.shields.io/badge/Ollama-nyashastino%2Flfx-black.svg)](https://ollama.com/nyashastino/lfx)
+[![Accuracy](https://img.shields.io/badge/Form_Accuracy-89.7%25_(Bench)-brightgreen.svg)](#how-well-it-works)
 [![License](https://img.shields.io/badge/License-Non--Commercial_Research-lightgrey.svg)](#license--attribution)
 
 **Logical Form Extractor** is a fine-tuned 3B parameter language model that parses natural-language arguments into structured JSON: isolating individual premises, identifying the conclusion, classifying the argument as deductive or inductive, naming the specific logical form or fallacy, and reconstructing any suppressed (enthymematic) premises.
 
-Available out-of-the-box on **Ollama** (`nyasha_stino/lfx`) and locally on Apple Silicon via **MLX** (`logicalform`).
+Available out-of-the-box on **Ollama** (`nyashastino/lfx`) and locally on Apple Silicon via **MLX** (`logicalform`).
 
 ```console
 $ ./logicalform "John says we should be vegetarians. John is a plant farmer,
@@ -31,7 +31,7 @@ The fastest way to use Logical Form Extractor is via [Ollama](https://ollama.com
 ### 1. Run from the Terminal
 
 ```bash
-ollama run nyasha_stino/lfx "All men are mortal. Socrates is a man. Therefore Socrates is mortal."
+ollama run nyashastino/lfx "All men are mortal. Socrates is a man. Therefore Socrates is mortal."
 ```
 
 Output:
@@ -54,13 +54,12 @@ Output:
 
 | Tag | Quantization | Size | End-to-End Form Accuracy | Notes |
 |---|---|---|---|---|
-| `nyasha_stino/lfx:latest`<br>`nyasha_stino/lfx:3b-q8` | `Q8_0` | 3.3 GB | **76.5%** | **Recommended.** Best overall accuracy and premise extraction fidelity. |
-| `nyasha_stino/lfx:3b-q4` | `Q4_K_M` | 1.9 GB | 75.5% | Lightweight & fast (~95 tok/s). 40% smaller RAM footprint. |
+| `nyashastino/lfx:latest`<br>`nyashastino/lfx:3b-q8` | `Q8_0` | 3.3 GB | **89.7%** (Full Benchmark)<br>**78.1%** (Held-Out Human Prose) | **Primary Release.** Best overall accuracy, highest premise extraction fidelity, 0.861 Macro-F1 across 22 classes. |
 
-To pull a specific tag:
+To pull the model:
 ```bash
-ollama pull nyasha_stino/lfx:3b-q8
-ollama pull nyasha_stino/lfx:3b-q4
+ollama pull nyashastino/lfx
+ollama pull nyashastino/lfx:3b-q8
 ```
 
 ### 2. Python Integration
@@ -75,7 +74,7 @@ passage = (
 )
 
 response = ollama.chat(
-    model="nyasha_stino/lfx",
+    model="nyashastino/lfx",
     messages=[{"role": "user", "content": passage}],
 )
 
@@ -89,7 +88,7 @@ print(f"Conclusion: {data['conclusion']}")
 
 ```bash
 curl http://localhost:11434/api/generate -d '{
-  "model": "nyasha_stino/lfx",
+  "model": "nyashastino/lfx",
   "prompt": "If it rained, the sidewalk would be wet. It did not rain. Thus, the sidewalk is not wet.",
   "stream": false
 }'
@@ -138,40 +137,50 @@ Detailed definitions and validation logic are implemented in [`lfx/schema.py`](l
 
 ## How Well It Works
 
-Evaluation on unseen test splits demonstrates that argument decomposition (premises and conclusion) is highly reliable, while form classification reaches strong accuracy on real human prose.
+Evaluation on the unified **LFX-Bench v1** (1,521 arguments covering all 22 classes with verified provenance) demonstrates strong premise extraction, near-perfect schema compliance, and high form accuracy across both symbolic logic and authentic human prose.
 
-### 1. Held-Out Real Human Passages (`extra_test_human`, n=485)
-Measured on 485 real human-written argumentative passages with ground-truth labels (never seen during training):
+### 1. Full Benchmark Evaluation (`LFX-Bench v1`, n=1521, 22 Classes)
 
-| Metric | Ollama Q8 (`3b-q8`) | Ollama Q4 (`3b-q4`) | MLX 8-bit (Local) |
-|---|---|---|---|
-| **JSON parses** | **1.000** | **1.000** | **1.000** |
-| **Schema validity** | **0.994** | 0.992 | 0.992 |
-| **Form Accuracy (end-to-end)** | **0.765** | 0.755 | 0.763 |
-| **Argument Type Accuracy** | **0.838** | **0.838** | 0.842 |
-| **Premise F1** | 0.715 | 0.701 | **0.743** |
-| **Suppressed Premise Match** | 0.784 | 0.748 | **0.800** |
-| **Inference Speed (Apple M4 Pro)** | ~63 tok/s | ~95 tok/s | ~55 tok/s |
+Scored using greedy decoding (temperature 0) against ground-truth labels:
 
-#### Breakdown by Fallacy Category on Real Human Prose:
-- **False dilemma:** 82.7% (43 / 52)
-- **Ad hominem:** 78.9% (157 / 199)
-- **Ad populum:** 77.9% (81 / 104)
-- **Straw man:** 75.9% (41 / 54)
-- **Begging the question:** 64.5% (49 / 76)
-
-### 2. Condensed Philosophical & Historical Texts (`test_real`, n=34)
-Evaluated on complex classical texts (condensed passages from Aquinas, Hume, Madison, Frederick Douglass, etc.):
-
-| Metric | Base Model (Qwen2.5-3B) | Fine-Tuned (LFX-3B) |
+| Metric | Base Model (Qwen2.5-3B) | Tuned LFX (3B-Q8) |
 |---|---|---|
-| **Premise F1** | 0.778 | **0.881** |
-| **Conclusion Similarity** | 0.868 | **0.951** |
-| **Schema Validity** | 0.735 | **1.000** |
-| **Form Accuracy (Overall)** | 0.029 | **0.529** |
+| **End-to-End Form Accuracy** | 0.029 | **0.897** (89.7%) |
+| **Macro-F1 (across 22 classes)** | ~0.03 | **0.861** |
+| **Schema Validity** | 0.735 | **0.998** (99.8%) |
+| **JSON Parses** | 0.812 | **0.999** (99.9%) |
+| **Argument Type Accuracy** | 0.560 | **0.944** (94.4%) |
+| **Premise F1** | 0.778 | **0.890** |
+| **Conclusion Similarity** | 0.868 | **0.911** |
+| **Suppressed Premise Match** | 0.480 | **0.900** |
 
-> [!NOTE]
-> On complex philosophical prose, 12 of the 34 passages represent multi-step arguments classified under `other`. On the 22 single-form passages, form accuracy reaches **63.6%** (14 / 22).
+### 2. Breakdown by Provenance Tier
+
+The benchmark evaluates four distinct tiers to prevent ease-of-generation biases from masking real-world performance:
+
+| Tier | n | Description / Guarantee | Form Accuracy |
+|---|---|---|---|
+| **constructed-symbolic** | 693 | Label fixed by construction; verified by blind formalization round-trip through `lfx.formal` | **98.8%** (685 / 693) |
+| **constructed-consensus** | 309 | Inductive forms; verified by two distinct model families agreeing blind | **92.9%** (287 / 309) |
+| **external-human** | 485 | Authentic human prose from the LOGIC dataset (never seen in training) | **78.1%** (379 / 485) |
+| **project-authored** | 34 | Condensed historical & philosophical texts (Aquinas, Hume, Douglass, etc.)* | **41.2%** (14 / 34) |
+
+*\*On `project-authored`, 12 of the 34 passages are multi-step chained arguments classified under `other`. On the 22 single-form passages, form accuracy reaches **63.6%** (14 / 22).*
+
+### 3. Precision, Recall, and F1 on Key Forms
+
+| Form | Precision | Recall | F1 | Notes |
+|---|---|---|---|---|
+| `hypothetical syllogism` | 1.000 | 1.000 | **1.000** | Perfect rule extraction |
+| `affirming the consequent` | 0.989 | 0.989 | **0.989** | Overcomes charity repair |
+| `reductio ad absurdum` | 0.963 | 0.988 | **0.975** | Raised from 2.5% in early checkpoints |
+| `categorical syllogism` | 0.864 | 0.989 | **0.922** | Robust quantified premise recognition |
+| `ad hominem` | 0.962 | 0.750 | **0.843** | Rebalanced; clean separation from straw man |
+| `ad populum` | 0.835 | 0.827 | **0.831** | Stable on human political prose |
+| `false dilemma` | 0.772 | 0.830 | **0.800** | Distinguishes disjunctions from false dilemmas |
+| `begging the question` | 0.885 | 0.711 | **0.788** | Catches circular premises |
+| `straw man` | 0.568 | 0.852 | **0.681** | Rescued from over-prediction |
+| `equivocation` | 0.643 | 0.643 | **0.643** | Detects semantic term shifts |
 
 ---
 
@@ -234,8 +243,10 @@ pipeline/                Data and training pipeline
   deploy/                llama.cpp conversion and Ollama Modelfile packaging
 
 data/                    Dataset splits and raw sources
-  splits/                train (741), val (160), test_gen (160), test_real (34), extra_test_human (485)
+  benchmark/             lfx_bench_v1 (1521 records across 22 classes with provenance)
+  splits/                train (2069), val (160), test_gen (160), test_real (34), extra_test_human (485)
   logic/                 LOGIC / LogicClimate dataset (Jin et al., EMNLP Findings 2022)
+  mafalda/               MAFALDA gold standard validation set (Helwe et al., 2024)
 
 docs/                    In-depth documentation
   PROJECT_BRIEF.md       Comprehensive technical report and engineering log

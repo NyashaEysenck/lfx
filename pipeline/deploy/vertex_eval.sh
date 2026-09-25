@@ -26,7 +26,7 @@ set -euo pipefail
 GOLD="${1:?usage: vertex_eval.sh <gold.jsonl> <out.jsonl> [shards] [model] [machine]}"
 OUT="${2:?}"
 SHARDS="${3:-4}"
-MODEL="${4:-nyasha_stino/lfx:3b-q8}"
+MODEL="${4:-nyashastino/lfx:3b-q8}"
 MACHINE="${5:-n2-standard-16}"
 
 P="${GOOGLE_CLOUD_PROJECT:?Error: GOOGLE_CLOUD_PROJECT must be set. Export it or configure in .env}"

@@ -10,7 +10,7 @@ set -euo pipefail
 TAG="v7"
 BASE="unsloth/Qwen2.5-3B-Instruct"
 EPOCHS=6
-REGISTRY="nyasha_stino/lfx:v7-q8"
+REGISTRY="nyashastino/lfx:v7-q8"
 BENCH="data/benchmark/lfx_bench_v1.jsonl"
 PREDS="results/preds_v7_bench_full.jsonl"
 

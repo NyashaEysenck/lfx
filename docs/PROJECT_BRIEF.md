@@ -9,7 +9,7 @@ This report documents the end-to-end engineering, training dynamics, dataset cur
 - **Fine-Tuning Technique:** LoRA ($r=16$, $\alpha=32$, 6 epochs, target modules: `q_proj`, `k_proj`, `v_proj`, `o_proj`, `gate_proj`, `up_proj`, `down_proj`)
 - **Schema:** v2.0 (22 logical forms, list-valued `form`, `premises`, `conclusion`, `argument_type`, `suppressed_premise`)
 - **Deployment Artifacts:**
-  - **Ollama Registry:** `nyasha_stino/lfx` (`:3b-q8`, `:3b-q4`, `:latest`)
+  - **Ollama Registry:** `nyashastino/lfx` (`:3b-q8`, `:latest`)
   - **Apple Silicon (MLX):** `models/mlx_v5_8bit` via the `./logicalform` CLI
 - **Benchmark Performance (Held-Out Human Prose, $n=485$):**
   - **End-to-End Form Accuracy:** **76.5%** (`3b-q8`) / **75.5%** (`3b-q4`) / **76.3%** (MLX 8-bit)
@@ -205,7 +205,7 @@ Increasing training duration from 3 to 6 epochs completely stabilized schema com
 | **Suppressed Present** | 0.784 | 0.748 | **0.800** |
 | **Throughput (M4 Pro)** | ~63 tok/s | ~95 tok/s | ~55 tok/s |
 
-Released both tags to Ollama (`nyasha_stino/lfx:3b-q8` and `nyasha_stino/lfx:3b-q4`).
+Released the production model to Ollama (`nyashastino/lfx:latest` and `nyashastino/lfx:3b-q8`).
 
 ---
 
