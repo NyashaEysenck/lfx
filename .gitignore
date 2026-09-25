@@ -24,4 +24,6 @@ data/splits/train_v6*
 # Generated deployment and interim build files
 Modelfile.*
 data/interim/*_202*.jsonl
+docs/OLLAMA_SUMMARY.md
+docs/OLLAMA_README.md
 
